@@ -8,7 +8,7 @@ use encoding_rs::{Decoder, DecoderResult, Encoding};
 use js::typedarray::ArrayBufferU8;
 use script_bindings::str::DOMString;
 
-use crate::dom::bindings::buffer_source::HeapBufferSource;
+use crate::dom::bindings::buffer_source::HeapBufferSourceWrapper;
 use crate::dom::bindings::error::{Error, Fallible};
 use crate::script_runtime::JSContext as SafeJSContext;
 
@@ -84,7 +84,7 @@ impl TextDecoderCommon {
     pub(crate) fn decode(
         &self,
         cx: SafeJSContext,
-        input: Option<&HeapBufferSource<ArrayBufferU8>>,
+        input: Option<HeapBufferSourceWrapper<ArrayBufferU8>>,
         do_not_flush: bool,
     ) -> Fallible<String> {
         // Step 1. If this’s do not flush is false, then set this’s decoder to a
@@ -105,7 +105,7 @@ impl TextDecoderCommon {
 
         // Step 3. If input is given, then push a copy of input to this’s I/O queue.
         if let Some(input) = input {
-            let len = input.byte_length();
+            let len = input.len();
             let mut in_stream = self.in_stream.borrow_mut();
             let cur_len = in_stream.len();
             let new_len = cur_len + len;

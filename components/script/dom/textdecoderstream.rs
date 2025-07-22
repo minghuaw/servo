@@ -11,7 +11,7 @@ use js::jsval::UndefinedValue;
 use js::rust::{HandleObject as SafeHandleObject, HandleValue as SafeHandleValue};
 
 use crate::DomTypes;
-use crate::dom::bindings::buffer_source::HeapBufferSource;
+use crate::dom::bindings::buffer_source::HeapBufferSourceWrapper;
 use crate::dom::bindings::codegen::Bindings::TextDecoderBinding;
 use crate::dom::bindings::codegen::Bindings::TextDecoderStreamBinding::TextDecoderStreamMethods;
 use crate::dom::bindings::codegen::UnionTypes::ArrayBufferViewOrArrayBuffer;
@@ -43,7 +43,7 @@ pub(crate) fn decode_and_enqueue_a_chunk(
     };
     let buffer_source = conversion_result
         .get_success_value()
-        .map(|value| HeapBufferSource::from_array_buffer_view_or_array_buffer(cx, value))
+        .map(|value| HeapBufferSourceWrapper::from_array_buffer_view_or_array_buffer(cx, value))
         .ok_or(Error::Type(
             "Unable to convert chunk into ArrayBuffer or ArrayBufferView".to_string(),
         ))?;
@@ -52,7 +52,7 @@ pub(crate) fn decode_and_enqueue_a_chunk(
     // Step 3. Let output be the I/O queue of scalar values « end-of-queue ».
     // Step 4. Implemented by `TextDecoderCommon::decode`, which uses the same procedure as
     //      `TextDecoder`
-    let output_chunk = decoder.decode(cx, Some(&buffer_source), true)?;
+    let output_chunk = decoder.decode(cx, Some(buffer_source), true)?;
 
     // Step 4.2.2 If outputChunk is not the empty string, then enqueue
     //      outputChunk in decoder’s transform.

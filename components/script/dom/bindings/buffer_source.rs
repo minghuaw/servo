@@ -260,9 +260,11 @@ where
     pub(crate) fn byte_length(&self) -> usize {
         match &self.buffer_source {
             BufferSource::ArrayBufferView(buffer) => unsafe {
+                log::debug!("JS_GetArrayBufferViewByteLength");
                 JS_GetArrayBufferViewByteLength(*buffer.handle())
             },
             BufferSource::ArrayBuffer(buffer) => unsafe {
+                log::debug!("GetArrayBufferByteLength");
                 GetArrayBufferByteLength(*buffer.handle())
             },
         }
@@ -597,26 +599,50 @@ where
     }
 }
 
-impl HeapBufferSource<ArrayBufferU8> {
+pub(crate) struct HeapBufferSourceWrapper<T> {
+    buffer_source: HeapBufferSource<T>,
+    len: usize,
+}
+
+impl<T> HeapBufferSourceWrapper<T> {
+    pub(crate) fn len(&self) -> usize {
+        self.len
+    }
+}
+
+impl<T> std::ops::Deref for HeapBufferSourceWrapper<T> {
+    type Target = HeapBufferSource<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.buffer_source
+    }
+}
+
+impl HeapBufferSourceWrapper<ArrayBufferU8> {
     pub(crate) fn from_array_buffer_view_or_array_buffer(
         cx: JSContext,
         value: &ArrayBufferViewOrArrayBuffer,
-    ) -> HeapBufferSource<ArrayBufferU8> {
-        match value {
+    ) -> HeapBufferSourceWrapper<ArrayBufferU8> {
+        let (buffer_source, len) = match value {
             ArrayBufferViewOrArrayBuffer::ArrayBufferView(view) => {
+                let len = unsafe { view.as_slice().len() };
                 let view_heap =
                     HeapBufferSource::<ArrayBufferViewU8>::new(BufferSource::ArrayBufferView(
                         Heap::boxed(unsafe { view.underlying_object().get() }),
                     ));
-
-                view_heap.get_array_buffer_view_buffer(cx)
+                (view_heap.get_array_buffer_view_buffer(cx), len)
             },
             ArrayBufferViewOrArrayBuffer::ArrayBuffer(buf) => {
-                HeapBufferSource::<ArrayBufferU8>::new(BufferSource::ArrayBuffer(Heap::boxed(
-                    unsafe { buf.underlying_object().get() },
-                )))
+                let len = unsafe { buf.as_slice().len() };
+                let buffer_source =
+                    HeapBufferSource::<ArrayBufferU8>::new(BufferSource::ArrayBuffer(Heap::boxed(
+                        unsafe { buf.underlying_object().get() },
+                    )));
+                (buffer_source, len)
             },
-        }
+        };
+
+        Self { buffer_source, len }
     }
 }
 
