@@ -260,11 +260,9 @@ where
     pub(crate) fn byte_length(&self) -> usize {
         match &self.buffer_source {
             BufferSource::ArrayBufferView(buffer) => unsafe {
-                log::debug!("JS_GetArrayBufferViewByteLength");
                 JS_GetArrayBufferViewByteLength(*buffer.handle())
             },
             BufferSource::ArrayBuffer(buffer) => unsafe {
-                log::debug!("GetArrayBufferByteLength");
                 GetArrayBufferByteLength(*buffer.handle())
             },
         }
