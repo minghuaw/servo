@@ -96,8 +96,14 @@ impl<'dom> ServoLayoutNode<'dom> {
             .map(LayoutDom::upcast)
             .map(ServoLayoutElement::from_layout_js)
     }
+}
 
-    pub fn is_text_input(&self) -> bool {
+pub trait LayoutNodeExt<'dom> {
+    fn is_text_input(&self) -> bool;
+}
+
+impl<'dom> LayoutNodeExt<'dom> for ServoLayoutNode<'dom> {
+    fn is_text_input(&self) -> bool {
         self.node.is_text_input()
     }
 }

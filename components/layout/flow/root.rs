@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use std::marker::PhantomData;
+
 use app_units::Au;
 use atomic_refcell::AtomicRef;
 use compositing_traits::display_list::AxesScrollSensitivity;
@@ -124,10 +126,14 @@ impl BoxTree {
     /// * how intrinsic content sizes are computed eagerly makes it hard
     ///   to update those sizes for ancestors of the node from which we
     ///   made an incremental update.
-    pub(crate) fn update(
+    pub(crate) fn update<'dom, T>(
         context: &LayoutContext,
-        dirty_root_from_script: ServoLayoutNode<'_>,
-    ) -> bool {
+        // dirty_root_from_script: ServoLayoutNode<'_>,
+        dirty_root_from_script: T,
+    ) -> bool 
+    where 
+        T: LayoutNode<'dom> + NodeExt<'dom>,
+    {
         let Some(box_tree_update) = IncrementalBoxTreeUpdate::find(dirty_root_from_script) else {
             return false;
         };
@@ -259,15 +265,30 @@ enum DirtyRootBoxTreeNode {
     AbsolutelyPositionedTaffyLevelBox(ArcRefCell<TaffyItemBox>),
 }
 
-struct IncrementalBoxTreeUpdate<'dom> {
-    node: ServoLayoutNode<'dom>,
+// pub trait IncrementalBoxTreeUpdateNode: TNode {
+
+// }
+
+// impl<'dom> IncrementalBoxTreeUpdateNode for ServoLayoutNode<'dom> {
+
+// }
+
+struct IncrementalBoxTreeUpdate<'dom, T> 
+where 
+    T: LayoutNode<'dom>,
+{
+    node: T,
+    lt_marker: PhantomData<&'dom ()>,
     box_tree_node: DirtyRootBoxTreeNode,
     primary_style: Arc<ComputedValues>,
     display_inside: DisplayInside,
 }
 
-impl<'dom> IncrementalBoxTreeUpdate<'dom> {
-    fn find(dirty_root_from_script: ServoLayoutNode<'dom>) -> Option<Self> {
+impl<'dom, T> IncrementalBoxTreeUpdate<'dom, T> 
+where 
+    T: LayoutNode<'dom> + NodeExt<'dom>,
+{
+    fn find(dirty_root_from_script: T) -> Option<Self> {
         let mut maybe_dirty_root_node = Some(dirty_root_from_script);
         while let Some(dirty_root_node) = maybe_dirty_root_node {
             if let Some(dirty_root) = Self::new_if_valid(dirty_root_node) {
@@ -280,7 +301,7 @@ impl<'dom> IncrementalBoxTreeUpdate<'dom> {
         None
     }
 
-    fn new_if_valid(potential_dirty_root_node: ServoLayoutNode<'dom>) -> Option<Self> {
+    fn new_if_valid(potential_dirty_root_node: T) -> Option<Self> {
         if !potential_dirty_root_node.is_element() {
             return None;
         }
@@ -370,6 +391,7 @@ impl<'dom> IncrementalBoxTreeUpdate<'dom> {
 
         Some(Self {
             node: potential_dirty_root_node,
+            lt_marker: PhantomData,
             box_tree_node,
             primary_style: primary_style.clone(),
             display_inside,

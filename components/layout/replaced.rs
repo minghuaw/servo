@@ -7,6 +7,7 @@ use base::id::{BrowsingContextId, PipelineId};
 use data_url::DataUrl;
 use embedder_traits::ViewportDetails;
 use euclid::{Scale, Size2D};
+use layout_api::wrapper_traits::LayoutNode;
 use layout_api::IFrameSize;
 use malloc_size_of_derive::MallocSizeOf;
 use net_traits::image_cache::{Image, ImageOrMetadataAvailable, UsePlaceholder};
@@ -118,7 +119,10 @@ pub(crate) enum ReplacedContentKind {
 }
 
 impl ReplacedContents {
-    pub fn for_element(element: ServoLayoutNode<'_>, context: &LayoutContext) -> Option<Self> {
+    pub fn for_element<'dom, T>(element: T, context: &LayoutContext) -> Option<Self> 
+    where 
+        T: LayoutNode<'dom> + NodeExt<'dom>,
+    {
         if let Some(ref data_attribute_string) = element.as_typeless_object_with_data_attribute() {
             if let Some(url) = try_to_parse_image_data_url(data_attribute_string) {
                 return Self::from_image_url(
@@ -184,11 +188,14 @@ impl ReplacedContents {
         })
     }
 
-    pub fn from_image_url(
-        element: ServoLayoutNode<'_>,
+    pub fn from_image_url<'dom, T>(
+        element: T,
         context: &LayoutContext,
         image_url: &ComputedUrl,
-    ) -> Option<Self> {
+    ) -> Option<Self> 
+    where 
+        T: LayoutNode<'dom> + NodeExt<'dom>,
+    {
         if let ComputedUrl::Valid(image_url) = image_url {
             let (image, width, height) = match context.image_resolver.get_or_request_image_or_meta(
                 element.opaque(),
@@ -220,11 +227,14 @@ impl ReplacedContents {
         None
     }
 
-    pub fn from_image(
-        element: ServoLayoutNode<'_>,
+    pub fn from_image<'dom, T>(
+        element: T,
         context: &LayoutContext,
         image: &ComputedImage,
-    ) -> Option<Self> {
+    ) -> Option<Self> 
+    where 
+        T: LayoutNode<'dom> + NodeExt<'dom>,
+    {
         match image {
             ComputedImage::Url(image_url) => Self::from_image_url(element, context, image_url),
             _ => None, // TODO

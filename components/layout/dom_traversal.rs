@@ -4,13 +4,14 @@
 
 use std::borrow::Cow;
 use std::iter::FusedIterator;
+use std::marker::PhantomData;
 
 use fonts::ByteIndex;
 use html5ever::{LocalName, local_name};
 use layout_api::wrapper_traits::{LayoutNode, ThreadSafeLayoutElement, ThreadSafeLayoutNode};
 use layout_api::{LayoutDamage, LayoutElementType, LayoutNodeType};
 use range::Range;
-use script::layout_dom::ServoLayoutNode;
+use script::layout_dom::{LayoutNodeExt, ServoLayoutNode};
 use selectors::Element as SelectorsElement;
 use servo_arc::Arc as ServoArc;
 use style::dom::{NodeInfo, TElement, TNode, TShadowRoot};
@@ -30,21 +31,29 @@ use crate::style_ext::{Display, DisplayGeneratingBox, DisplayInside, DisplayOuts
 /// A data structure used to pass and store related layout information together to
 /// avoid having to repeat the same arguments in argument lists.
 #[derive(Clone)]
-pub(crate) struct NodeAndStyleInfo<'dom> {
-    pub node: ServoLayoutNode<'dom>,
+pub(crate) struct NodeAndStyleInfo<'dom, T> 
+where 
+    T: LayoutNode<'dom>,
+{
+    pub node: T,
+    pub lt_marker: PhantomData<&'dom ()>,
     pub pseudo_element_type: Option<PseudoElement>,
     pub style: ServoArc<ComputedValues>,
     pub damage: LayoutDamage,
 }
 
-impl<'dom> NodeAndStyleInfo<'dom> {
+impl<'dom, T> NodeAndStyleInfo<'dom, T> 
+where 
+    T: LayoutNode<'dom>,
+{
     pub(crate) fn new(
-        node: ServoLayoutNode<'dom>,
+        node: T,
         style: ServoArc<ComputedValues>,
         damage: LayoutDamage,
     ) -> Self {
         Self {
             node,
+            lt_marker: PhantomData,
             pseudo_element_type: None,
             style,
             damage,
@@ -68,6 +77,7 @@ impl<'dom> NodeAndStyleInfo<'dom> {
             .style(&context.style_context);
         Some(NodeAndStyleInfo {
             node: self.node,
+            lt_marker: PhantomData,
             pseudo_element_type: Some(pseudo_element_type),
             style,
             damage: self.damage,
@@ -83,8 +93,11 @@ impl<'dom> NodeAndStyleInfo<'dom> {
     }
 }
 
-impl<'dom> From<&NodeAndStyleInfo<'dom>> for BaseFragmentInfo {
-    fn from(info: &NodeAndStyleInfo<'dom>) -> Self {
+impl<'dom, T> From<&NodeAndStyleInfo<'dom, T>> for BaseFragmentInfo 
+where 
+    T: LayoutNode<'dom>,
+{
+    fn from(info: &NodeAndStyleInfo<'dom, T>) -> Self {
         let node = info.node;
         let pseudo = info.pseudo_element_type;
         let threadsafe_node = node.to_threadsafe();
@@ -168,13 +181,16 @@ pub(super) enum PseudoElementContentItem {
     Replaced(ReplacedContents),
 }
 
-pub(super) trait TraversalHandler<'dom> {
-    fn handle_text(&mut self, info: &NodeAndStyleInfo<'dom>, text: Cow<'dom, str>);
+pub(super) trait TraversalHandler<'dom, T> 
+where 
+    T: LayoutNode<'dom>,
+{
+    fn handle_text(&mut self, info: &NodeAndStyleInfo<'dom, T>, text: Cow<'dom, str>);
 
     /// Or pseudo-element
     fn handle_element(
         &mut self,
-        info: &NodeAndStyleInfo<'dom>,
+        info: &NodeAndStyleInfo<'dom, T>,
         display: DisplayGeneratingBox,
         contents: Contents,
         box_slot: BoxSlot<'dom>,
@@ -187,11 +203,14 @@ pub(super) trait TraversalHandler<'dom> {
     fn leave_display_contents(&mut self) {}
 }
 
-fn traverse_children_of<'dom>(
-    parent_element_info: &NodeAndStyleInfo<'dom>,
+fn traverse_children_of<'dom, T>(
+    parent_element_info: &NodeAndStyleInfo<'dom, T>,
     context: &LayoutContext,
-    handler: &mut impl TraversalHandler<'dom>,
-) {
+    handler: &mut impl TraversalHandler<'dom, T>,
+) 
+where 
+    T: LayoutNode<'dom> + LayoutNodeExt<'dom> + NodeExt<'dom>,
+{
     traverse_eager_pseudo_element(PseudoElement::Before, parent_element_info, context, handler);
 
     if parent_element_info.node.is_text_input() {
@@ -226,11 +245,14 @@ fn traverse_children_of<'dom>(
     traverse_eager_pseudo_element(PseudoElement::After, parent_element_info, context, handler);
 }
 
-fn traverse_element<'dom>(
-    element: ServoLayoutNode<'dom>,
+fn traverse_element<'dom, T>(
+    element: T,
     context: &LayoutContext,
-    handler: &mut impl TraversalHandler<'dom>,
-) {
+    handler: &mut impl TraversalHandler<'dom, T>,
+) 
+where 
+    T: LayoutNode<'dom> + LayoutNodeExt<'dom> + NodeExt<'dom>,
+{
     element.unset_all_pseudo_boxes();
 
     let replaced = ReplacedContents::for_element(element, context);
@@ -276,12 +298,15 @@ fn traverse_element<'dom>(
     }
 }
 
-fn traverse_eager_pseudo_element<'dom>(
+fn traverse_eager_pseudo_element<'dom, T>(
     pseudo_element_type: PseudoElement,
-    node_info: &NodeAndStyleInfo<'dom>,
+    node_info: &NodeAndStyleInfo<'dom, T>,
     context: &LayoutContext,
-    handler: &mut impl TraversalHandler<'dom>,
-) {
+    handler: &mut impl TraversalHandler<'dom, T>,
+) 
+where 
+    T: LayoutNode<'dom> + LayoutNodeExt<'dom> + NodeExt<'dom>,
+{
     assert!(pseudo_element_type.is_eager());
 
     // If this node doesn't have this eager pseudo-element, exit early. This depends on
@@ -318,12 +343,15 @@ fn traverse_eager_pseudo_element<'dom>(
     }
 }
 
-fn traverse_pseudo_element_contents<'dom>(
-    info: &NodeAndStyleInfo<'dom>,
+fn traverse_pseudo_element_contents<'dom, T>(
+    info: &NodeAndStyleInfo<'dom, T>,
     context: &LayoutContext,
-    handler: &mut impl TraversalHandler<'dom>,
+    handler: &mut impl TraversalHandler<'dom, T>,
     items: Vec<PseudoElementContentItem>,
-) {
+) 
+where 
+    T: LayoutNode<'dom> + LayoutNodeExt<'dom> + NodeExt<'dom>,
+{
     let mut anonymous_info = None;
     for item in items {
         match item {
@@ -370,12 +398,15 @@ impl From<NonReplacedContents> for Contents {
 }
 
 impl NonReplacedContents {
-    pub(crate) fn traverse<'dom>(
+    pub(crate) fn traverse<'dom, T>(
         self,
         context: &LayoutContext,
-        info: &NodeAndStyleInfo<'dom>,
-        handler: &mut impl TraversalHandler<'dom>,
-    ) {
+        info: &NodeAndStyleInfo<'dom, T>,
+        handler: &mut impl TraversalHandler<'dom, T>,
+    ) 
+    where 
+        T: LayoutNode<'dom> + LayoutNodeExt<'dom> + NodeExt<'dom>,
+    {
         match self {
             NonReplacedContents::OfElement | NonReplacedContents::OfTextControl => {
                 traverse_children_of(info, context, handler)
@@ -399,10 +430,13 @@ where
 }
 
 /// <https://www.w3.org/TR/CSS2/generate.html#propdef-content>
-fn generate_pseudo_element_content(
-    pseudo_element_info: &NodeAndStyleInfo,
+fn generate_pseudo_element_content<'dom, T>(
+    pseudo_element_info: &NodeAndStyleInfo<'dom, T>,
     context: &LayoutContext,
-) -> Vec<PseudoElementContentItem> {
+) -> Vec<PseudoElementContentItem> 
+where 
+    T: LayoutNode<'dom> + NodeExt<'dom>,
+{
     match &pseudo_element_info.style.get_counters().content {
         Content::Items(items) => {
             let mut vec = vec![];
@@ -486,14 +520,23 @@ fn generate_pseudo_element_content(
     }
 }
 
-pub enum ChildNodeIterator<'dom> {
+pub enum ChildNodeIterator<'dom, T> {
     /// Iterating over the children of a node
-    Node(Option<ServoLayoutNode<'dom>>),
+    Node {
+        node: Option<T>,
+        lt: PhantomData<&'dom ()>,
+    },
     /// Iterating over the assigned nodes of a `HTMLSlotElement`
-    Slottables(<Vec<ServoLayoutNode<'dom>> as IntoIterator>::IntoIter),
+    Slottables {
+        slots: <Vec<T> as IntoIterator>::IntoIter,
+        lt: PhantomData<&'dom ()>,
+    },
 }
 
-pub(crate) fn iter_child_nodes(parent: ServoLayoutNode<'_>) -> ChildNodeIterator<'_> {
+pub(crate) fn iter_child_nodes<'dom, T>(parent: T) -> ChildNodeIterator<'dom, T> 
+where 
+    T: LayoutNode<'dom>,
+{
     if let Some(element) = parent.as_element() {
         if let Some(shadow) = element.shadow_root() {
             return iter_child_nodes(shadow.as_node());
@@ -502,27 +545,36 @@ pub(crate) fn iter_child_nodes(parent: ServoLayoutNode<'_>) -> ChildNodeIterator
         let slotted_nodes = element.slotted_nodes();
         if !slotted_nodes.is_empty() {
             #[allow(clippy::unnecessary_to_owned)] // Clippy is wrong.
-            return ChildNodeIterator::Slottables(slotted_nodes.to_owned().into_iter());
+            return ChildNodeIterator::Slottables {
+                slots: slotted_nodes.to_owned().into_iter(),
+                lt: PhantomData,
+            };
         }
     }
 
     let first = parent.first_child();
-    ChildNodeIterator::Node(first)
+    ChildNodeIterator::Node {
+        node: first,
+        lt: PhantomData,
+    }
 }
 
-impl<'dom> Iterator for ChildNodeIterator<'dom> {
-    type Item = ServoLayoutNode<'dom>;
+impl<'dom, T> Iterator for ChildNodeIterator<'dom, T> 
+where 
+    T: LayoutNode<'dom>
+{
+    type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            Self::Node(node) => {
+            Self::Node{node, ..} => {
                 let old = *node;
                 *node = old?.next_sibling();
                 old
             },
-            Self::Slottables(slots) => slots.next(),
+            Self::Slottables{slots, ..} => slots.next(),
         }
     }
 }
 
-impl FusedIterator for ChildNodeIterator<'_> {}
+impl<'dom, T> FusedIterator for ChildNodeIterator<'dom, T> where T: LayoutNode<'dom> {}
