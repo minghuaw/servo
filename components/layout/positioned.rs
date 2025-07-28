@@ -5,9 +5,11 @@
 use std::mem;
 
 use app_units::Au;
+use layout_api::wrapper_traits::LayoutNode;
 use malloc_size_of_derive::MallocSizeOf;
 use rayon::iter::IntoParallelRefMutIterator;
 use rayon::prelude::{IndexedParallelIterator, ParallelIterator};
+use script::layout_dom::LayoutNodeExt;
 use style::Zero;
 use style::computed_values::position::T as Position;
 use style::logical_geometry::{Direction, WritingMode};
@@ -16,6 +18,7 @@ use style::values::specified::align::AlignFlags;
 
 use crate::cell::ArcRefCell;
 use crate::context::LayoutContext;
+use crate::dom::NodeExt;
 use crate::dom_traversal::{Contents, NodeAndStyleInfo};
 use crate::formatting_contexts::IndependentFormattingContext;
 use crate::fragment_tree::{BoxFragment, Fragment, FragmentFlags, HoistedSharedFragment};
@@ -51,12 +54,15 @@ impl AbsolutelyPositionedBox {
         Self { context }
     }
 
-    pub fn construct(
+    pub fn construct<'dom, T>(
         context: &LayoutContext,
-        node_info: &NodeAndStyleInfo,
+        node_info: &NodeAndStyleInfo<'dom,  T>,
         display_inside: DisplayInside,
         contents: Contents,
-    ) -> Self {
+    ) -> Self
+    where
+        T: LayoutNode<'dom> + LayoutNodeExt<'dom> + NodeExt<'dom>,
+    {
         Self {
             context: IndependentFormattingContext::construct(
                 context,

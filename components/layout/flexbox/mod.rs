@@ -3,8 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use geom::{FlexAxis, MainStartCrossStart};
+use layout_api::wrapper_traits::LayoutNode;
 use malloc_size_of_derive::MallocSizeOf;
-use script::layout_dom::ServoLayoutNode;
+use script::layout_dom::{LayoutNodeExt, ServoLayoutNode};
 use servo_arc::Arc as ServoArc;
 use style::context::SharedStyleContext;
 use style::logical_geometry::WritingMode;
@@ -19,7 +20,7 @@ use crate::PropagatedBoxTreeData;
 use crate::cell::ArcRefCell;
 use crate::construct_modern::{ModernContainerBuilder, ModernItemKind};
 use crate::context::LayoutContext;
-use crate::dom::LayoutBox;
+use crate::dom::{LayoutBox, NodeExt};
 use crate::dom_traversal::{NodeAndStyleInfo, NonReplacedContents};
 use crate::formatting_contexts::IndependentFormattingContext;
 use crate::fragment_tree::{BaseFragmentInfo, Fragment};
@@ -99,12 +100,15 @@ pub(crate) struct FlexContainer {
 }
 
 impl FlexContainer {
-    pub fn construct(
+    pub fn construct<'dom, T>(
         context: &LayoutContext,
-        info: &NodeAndStyleInfo<'_>,
+        info: &NodeAndStyleInfo<'dom, T>,
         contents: NonReplacedContents,
         propagated_data: PropagatedBoxTreeData,
-    ) -> Self {
+    ) -> Self
+    where
+        T: LayoutNode<'dom> + LayoutNodeExt<'dom> + NodeExt<'dom>,
+    {
         let mut builder = ModernContainerBuilder::new(context, info, propagated_data);
         contents.traverse(context, info, &mut builder);
         let items = builder.finish();

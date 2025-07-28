@@ -7,12 +7,14 @@
 use std::borrow::Cow;
 use std::sync::LazyLock;
 
+use layout_api::wrapper_traits::LayoutNode;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use script::layout_dom::LayoutNodeExt;
 use style::selector_parser::PseudoElement;
 
 use crate::PropagatedBoxTreeData;
 use crate::context::LayoutContext;
-use crate::dom::{BoxSlot, LayoutBox};
+use crate::dom::{BoxSlot, LayoutBox, NodeExt};
 use crate::dom_traversal::{Contents, NodeAndStyleInfo, TraversalHandler};
 use crate::flow::inline::construct::InlineFormattingContextBuilder;
 use crate::flow::{BlockContainer, BlockFormattingContext};
@@ -24,32 +26,35 @@ use crate::layout_box_base::LayoutBoxBase;
 use crate::style_ext::{ComputedValuesExt, DisplayGeneratingBox};
 
 /// A builder used for both flex and grid containers.
-pub(crate) struct ModernContainerBuilder<'a, 'dom> {
+pub(crate) struct ModernContainerBuilder<'a, 'dom, T> {
     context: &'a LayoutContext<'a>,
-    info: &'a NodeAndStyleInfo<'dom>,
+    info: &'a NodeAndStyleInfo<'dom, T>,
     propagated_data: PropagatedBoxTreeData,
-    contiguous_text_runs: Vec<ModernContainerTextRun<'dom>>,
+    contiguous_text_runs: Vec<ModernContainerTextRun<'dom, T>>,
     /// To be run in parallel with rayon in `finish`
-    jobs: Vec<ModernContainerJob<'dom>>,
+    jobs: Vec<ModernContainerJob<'dom, T>>,
     has_text_runs: bool,
 }
 
-enum ModernContainerJob<'dom> {
+enum ModernContainerJob<'dom, T> {
     ElementOrPseudoElement {
-        info: NodeAndStyleInfo<'dom>,
+        info: NodeAndStyleInfo<'dom, T>,
         display: DisplayGeneratingBox,
         contents: Contents,
         box_slot: BoxSlot<'dom>,
     },
-    TextRuns(Vec<ModernContainerTextRun<'dom>>),
+    TextRuns(Vec<ModernContainerTextRun<'dom, T>>),
 }
 
-impl<'dom> ModernContainerJob<'dom> {
+impl<'dom, T> ModernContainerJob<'dom, T> {
     fn finish(
         self,
-        builder: &ModernContainerBuilder,
-        anonymous_info: &LazyLock<NodeAndStyleInfo<'dom>, impl FnOnce() -> NodeAndStyleInfo<'dom>>,
-    ) -> Option<ModernItem<'dom>> {
+        builder: &ModernContainerBuilder<'_, 'dom, T>,
+        anonymous_info: &LazyLock<NodeAndStyleInfo<'dom, T>, impl FnOnce() -> NodeAndStyleInfo<'dom, T>>,
+    ) -> Option<ModernItem<'dom>>
+    where
+        T: LayoutNode<'dom> + LayoutNodeExt<'dom> + NodeExt<'dom>,
+    {
         match self {
             ModernContainerJob::TextRuns(runs) => {
                 let mut inline_formatting_context_builder =
@@ -69,7 +74,7 @@ impl<'dom> ModernContainerJob<'dom> {
                 let block_formatting_context = BlockFormattingContext::from_block_container(
                     BlockContainer::InlineFormattingContext(inline_formatting_context),
                 );
-                let info: &NodeAndStyleInfo = anonymous_info;
+                let info: &NodeAndStyleInfo<T> = anonymous_info;
                 let formatting_context = IndependentFormattingContext {
                     base: LayoutBoxBase::new(info.into(), info.style.clone()),
                     contents: IndependentFormattingContextContents::NonReplaced(
@@ -141,12 +146,12 @@ impl<'dom> ModernContainerJob<'dom> {
     }
 }
 
-struct ModernContainerTextRun<'dom> {
-    info: NodeAndStyleInfo<'dom>,
+struct ModernContainerTextRun<'dom, T> {
+    info: NodeAndStyleInfo<'dom, T>,
     text: Cow<'dom, str>,
 }
 
-impl ModernContainerTextRun<'_> {
+impl<T> ModernContainerTextRun<'_, T> {
     /// <https://drafts.csswg.org/css-text/#white-space>
     fn is_only_document_white_space(&self) -> bool {
         // FIXME: is this the right definition? See
@@ -170,8 +175,11 @@ pub(crate) struct ModernItem<'dom> {
     pub box_slot: Option<BoxSlot<'dom>>,
 }
 
-impl<'dom> TraversalHandler<'dom> for ModernContainerBuilder<'_, 'dom> {
-    fn handle_text(&mut self, info: &NodeAndStyleInfo<'dom>, text: Cow<'dom, str>) {
+impl<'dom, T> TraversalHandler<'dom, T> for ModernContainerBuilder<'_, 'dom, T>
+where
+    T: LayoutNode<'dom>,
+{
+    fn handle_text(&mut self, info: &NodeAndStyleInfo<'dom, T>, text: Cow<'dom, str>) {
         self.contiguous_text_runs.push(ModernContainerTextRun {
             info: info.clone(),
             text,
@@ -181,7 +189,7 @@ impl<'dom> TraversalHandler<'dom> for ModernContainerBuilder<'_, 'dom> {
     /// Or pseudo-element
     fn handle_element(
         &mut self,
-        info: &NodeAndStyleInfo<'dom>,
+        info: &NodeAndStyleInfo<'dom, T>,
         display: DisplayGeneratingBox,
         contents: Contents,
         box_slot: BoxSlot<'dom>,
@@ -197,10 +205,10 @@ impl<'dom> TraversalHandler<'dom> for ModernContainerBuilder<'_, 'dom> {
     }
 }
 
-impl<'a, 'dom> ModernContainerBuilder<'a, 'dom> {
+impl<'a, 'dom, T> ModernContainerBuilder<'a, 'dom, T> {
     pub fn new(
         context: &'a LayoutContext<'a>,
-        info: &'a NodeAndStyleInfo<'dom>,
+        info: &'a NodeAndStyleInfo<'dom, T>,
         propagated_data: PropagatedBoxTreeData,
     ) -> Self {
         ModernContainerBuilder {
@@ -226,7 +234,10 @@ impl<'a, 'dom> ModernContainerBuilder<'a, 'dom> {
         }
     }
 
-    pub(crate) fn finish(mut self) -> Vec<ModernItem<'dom>> {
+    pub(crate) fn finish(mut self) -> Vec<ModernItem<'dom>>
+    where
+        T: LayoutNode<'dom> + LayoutNodeExt<'dom> + NodeExt<'dom>,
+    {
         self.wrap_any_text_in_anonymous_block_container();
 
         let anonymous_info = LazyLock::new(|| {

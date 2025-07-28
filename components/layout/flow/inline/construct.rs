@@ -7,6 +7,7 @@ use std::char::{ToLowercase, ToUppercase};
 
 use icu_segmenter::WordSegmenter;
 use itertools::izip;
+use layout_api::wrapper_traits::LayoutNode;
 use style::computed_values::white_space_collapse::T as WhiteSpaceCollapse;
 use style::values::specified::text::TextTransformCase;
 use unicode_bidi::Level;
@@ -91,7 +92,10 @@ pub(crate) struct InlineFormattingContextBuilder {
 }
 
 impl InlineFormattingContextBuilder {
-    pub(crate) fn new(info: &NodeAndStyleInfo) -> Self {
+    pub(crate) fn new<'dom, T>(info: &NodeAndStyleInfo<'dom, T>) -> Self
+    where
+        T: LayoutNode<'dom>,
+    {
         Self::new_for_shared_styles(vec![info.into()])
     }
 
@@ -293,7 +297,10 @@ impl InlineFormattingContextBuilder {
         (identifier, block_in_inline_splits)
     }
 
-    pub(crate) fn push_text<'dom>(&mut self, text: Cow<'dom, str>, info: &NodeAndStyleInfo<'dom>) {
+    pub(crate) fn push_text<'dom, T>(&mut self, text: Cow<'dom, str>, info: &NodeAndStyleInfo<'dom, T>)
+    where
+        T: LayoutNode<'dom>
+    {
         let white_space_collapse = info.style.clone_white_space_collapse();
         let collapsed = WhitespaceCollapse::new(
             text.chars(),

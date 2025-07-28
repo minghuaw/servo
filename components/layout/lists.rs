@@ -2,19 +2,24 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use layout_api::wrapper_traits::LayoutNode;
 use style::properties::longhands::list_style_type::computed_value::T as ListStyleType;
 use style::properties::style_structs;
 use style::values::computed::Image;
 
 use crate::context::LayoutContext;
+use crate::dom::NodeExt;
 use crate::dom_traversal::{NodeAndStyleInfo, PseudoElementContentItem};
 use crate::replaced::ReplacedContents;
 
 /// <https://drafts.csswg.org/css-lists/#content-property>
-pub(crate) fn make_marker<'dom>(
+pub(crate) fn make_marker<'dom, T>(
     context: &LayoutContext,
-    info: &NodeAndStyleInfo<'dom>,
-) -> Option<(NodeAndStyleInfo<'dom>, Vec<PseudoElementContentItem>)> {
+    info: &NodeAndStyleInfo<'dom, T>,
+) -> Option<(NodeAndStyleInfo<'dom, T>, Vec<PseudoElementContentItem>)>
+where
+    T: LayoutNode<'dom> + NodeExt<'dom>,
+{
     let marker_info = info.pseudo(context, style::selector_parser::PseudoElement::Marker)?;
     let style = &marker_info.style;
     let list_style = style.get_list();

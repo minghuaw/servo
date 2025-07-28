@@ -11,10 +11,10 @@ use html5ever::{LocalName, local_name};
 use layout_api::wrapper_traits::{LayoutNode, ThreadSafeLayoutElement, ThreadSafeLayoutNode};
 use layout_api::{LayoutDamage, LayoutElementType, LayoutNodeType};
 use range::Range;
-use script::layout_dom::{LayoutNodeExt, ServoLayoutNode};
+use script::layout_dom::LayoutNodeExt;
 use selectors::Element as SelectorsElement;
 use servo_arc::Arc as ServoArc;
-use style::dom::{NodeInfo, TElement, TNode, TShadowRoot};
+use style::dom::{TElement, TShadowRoot};
 use style::properties::ComputedValues;
 use style::selector_parser::PseudoElement;
 use style::values::generics::counters::{Content, ContentItem};
@@ -31,10 +31,7 @@ use crate::style_ext::{Display, DisplayGeneratingBox, DisplayInside, DisplayOuts
 /// A data structure used to pass and store related layout information together to
 /// avoid having to repeat the same arguments in argument lists.
 #[derive(Clone)]
-pub(crate) struct NodeAndStyleInfo<'dom, T> 
-where 
-    T: LayoutNode<'dom>,
-{
+pub(crate) struct NodeAndStyleInfo<'dom, T> {
     pub node: T,
     pub lt_marker: PhantomData<&'dom ()>,
     pub pseudo_element_type: Option<PseudoElement>,
@@ -43,7 +40,7 @@ where
 }
 
 impl<'dom, T> NodeAndStyleInfo<'dom, T> 
-where 
+where
     T: LayoutNode<'dom>,
 {
     pub(crate) fn new(
@@ -181,7 +178,7 @@ pub(super) enum PseudoElementContentItem {
     Replaced(ReplacedContents),
 }
 
-pub(super) trait TraversalHandler<'dom, T> 
+pub(super) trait TraversalHandler<'dom, T>
 where 
     T: LayoutNode<'dom>,
 {
@@ -528,7 +525,7 @@ pub enum ChildNodeIterator<'dom, T> {
     },
     /// Iterating over the assigned nodes of a `HTMLSlotElement`
     Slottables {
-        slots: <Vec<T> as IntoIterator>::IntoIter,
+        slots: std::vec::IntoIter<T>,
         lt: PhantomData<&'dom ()>,
     },
 }
@@ -572,7 +569,7 @@ where
                 *node = old?.next_sibling();
                 old
             },
-            Self::Slottables{slots, ..} => slots.next(),
+            Self::Slottables{slots, ..} => slots.next()
         }
     }
 }

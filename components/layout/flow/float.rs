@@ -13,7 +13,9 @@ use std::ops::Range;
 
 use app_units::{Au, MAX_AU, MIN_AU};
 use euclid::num::Zero;
+use layout_api::wrapper_traits::LayoutNode;
 use malloc_size_of_derive::MallocSizeOf;
+use script::layout_dom::LayoutNodeExt;
 use servo_arc::Arc;
 use style::computed_values::float::T as FloatProperty;
 use style::computed_values::position::T as Position;
@@ -22,6 +24,7 @@ use style::properties::ComputedValues;
 use style::values::computed::Clear as StyleClear;
 
 use crate::context::LayoutContext;
+use crate::dom::NodeExt;
 use crate::dom_traversal::{Contents, NodeAndStyleInfo};
 use crate::formatting_contexts::IndependentFormattingContext;
 use crate::fragment_tree::{BoxFragment, CollapsedMargin};
@@ -884,13 +887,16 @@ impl FloatBandLink {
 
 impl FloatBox {
     /// Creates a new float box.
-    pub fn construct(
+    pub fn construct<'dom, T>(
         context: &LayoutContext,
-        info: &NodeAndStyleInfo<'_>,
+        info: &NodeAndStyleInfo<'dom, T>,
         display_inside: DisplayInside,
         contents: Contents,
         propagated_data: PropagatedBoxTreeData,
-    ) -> Self {
+    ) -> Self
+    where
+        T: LayoutNode<'dom> + LayoutNodeExt<'dom> + NodeExt<'dom>,
+    {
         Self {
             contents: IndependentFormattingContext::construct(
                 context,

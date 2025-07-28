@@ -4,7 +4,9 @@
 
 use std::borrow::Cow;
 
+use layout_api::wrapper_traits::LayoutNode;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use script::layout_dom::LayoutNodeExt;
 use servo_arc::Arc;
 use style::properties::ComputedValues;
 use style::properties::longhands::list_style_position::computed_value::T as ListStylePosition;
@@ -32,13 +34,16 @@ use crate::style_ext::{ComputedValuesExt, DisplayGeneratingBox, DisplayInside, D
 use crate::table::{AnonymousTableContent, Table};
 
 impl BlockFormattingContext {
-    pub(crate) fn construct(
+    pub(crate) fn construct<'dom, T>(
         context: &LayoutContext,
-        info: &NodeAndStyleInfo<'_>,
+        info: &NodeAndStyleInfo<'dom, T>,
         contents: NonReplacedContents,
         propagated_data: PropagatedBoxTreeData,
         is_list_item: bool,
-    ) -> Self {
+    ) -> Self
+    where
+        T: LayoutNode<'dom> + NodeExt<'dom> + LayoutNodeExt<'dom>,
+    {
         Self::from_block_container(BlockContainer::construct(
             context,
             info,
@@ -57,8 +62,8 @@ impl BlockFormattingContext {
     }
 }
 
-struct BlockLevelJob<'dom> {
-    info: NodeAndStyleInfo<'dom>,
+struct BlockLevelJob<'dom, T> {
+    info: NodeAndStyleInfo<'dom, T>,
     box_slot: BoxSlot<'dom>,
     propagated_data: PropagatedBoxTreeData,
     kind: BlockLevelCreator,
@@ -107,12 +112,12 @@ enum IntermediateBlockContainer {
 ///
 /// This builder starts from the first child of a given DOM node
 /// and does a preorder traversal of all of its inclusive siblings.
-pub(crate) struct BlockContainerBuilder<'dom, 'style> {
+pub(crate) struct BlockContainerBuilder<'dom, 'style, T> {
     context: &'style LayoutContext<'style>,
 
     /// This NodeAndStyleInfo contains the root node, the corresponding pseudo
     /// content designator, and the block container style.
-    info: &'style NodeAndStyleInfo<'dom>,
+    info: &'style NodeAndStyleInfo<'dom, T>,
 
     /// The list of block-level boxes to be built for the final block container.
     ///
@@ -127,7 +132,7 @@ pub(crate) struct BlockContainerBuilder<'dom, 'style> {
     /// doesn't have a next sibling, we either reached the end of the container
     /// root or there are ongoing inline-level boxes
     /// (see `handle_block_level_element`).
-    block_level_boxes: Vec<BlockLevelJob<'dom>>,
+    block_level_boxes: Vec<BlockLevelJob<'dom, T>>,
 
     /// Whether or not this builder has yet produced a block which would be
     /// be considered the first line for the purposes of `text-indent`.
@@ -144,12 +149,12 @@ pub(crate) struct BlockContainerBuilder<'dom, 'style> {
 
     /// The [`NodeAndStyleInfo`] to use for anonymous block boxes pushed to the list of
     /// block-level boxes, lazily initialized.
-    anonymous_box_info: Option<NodeAndStyleInfo<'dom>>,
+    anonymous_box_info: Option<NodeAndStyleInfo<'dom, T>>,
 
     /// A collection of content that is being added to an anonymous table. This is
     /// composed of any sequence of internal table elements or table captions that
     /// are found outside of a table.
-    anonymous_table_content: Vec<AnonymousTableContent<'dom>>,
+    anonymous_table_content: Vec<AnonymousTableContent<'dom, T>>,
 
     /// Any [`InlineFormattingContexts`] created need to know about the ongoing `display: contents`
     /// ancestors that have been processed. This `Vec` allows passing those into new
@@ -158,13 +163,16 @@ pub(crate) struct BlockContainerBuilder<'dom, 'style> {
 }
 
 impl BlockContainer {
-    pub fn construct(
+    pub fn construct<'dom, T>(
         context: &LayoutContext,
-        info: &NodeAndStyleInfo<'_>,
+        info: &NodeAndStyleInfo<'dom, T>,
         contents: NonReplacedContents,
         propagated_data: PropagatedBoxTreeData,
         is_list_item: bool,
-    ) -> BlockContainer {
+    ) -> BlockContainer
+    where
+        T: LayoutNode<'dom> + NodeExt<'dom> + LayoutNodeExt<'dom>,
+    {
         let mut builder = BlockContainerBuilder::new(context, info, propagated_data);
 
         if is_list_item {
@@ -188,10 +196,13 @@ impl BlockContainer {
     }
 }
 
-impl<'dom, 'style> BlockContainerBuilder<'dom, 'style> {
+impl<'dom, 'style, T> BlockContainerBuilder<'dom, 'style, T>
+where
+    T: LayoutNode<'dom> + NodeExt<'dom> + LayoutNodeExt<'dom>,
+{
     pub(crate) fn new(
         context: &'style LayoutContext,
-        info: &'style NodeAndStyleInfo<'dom>,
+        info: &'style NodeAndStyleInfo<'dom, T>,
         propagated_data: PropagatedBoxTreeData,
     ) -> Self {
         BlockContainerBuilder {
@@ -225,7 +236,9 @@ impl<'dom, 'style> BlockContainerBuilder<'dom, 'style> {
     }
 
     fn finish_ongoing_inline_formatting_context(&mut self) -> Option<InlineFormattingContext> {
-        self.inline_formatting_context_builder.take()?.finish(
+        // self.inline_formatting_context_builder.take()?
+        Option::take(&mut self.inline_formatting_context_builder)?
+        .finish(
             self.context,
             !self.have_already_seen_first_line_for_text_indent,
             self.info.is_single_line_text_input(),
@@ -278,7 +291,7 @@ impl<'dom, 'style> BlockContainerBuilder<'dom, 'style> {
         // creation of an inline table. It requires the parent to be an inline box.
         let inline_table = self.currently_processing_inline_box();
 
-        let contents: Vec<AnonymousTableContent<'dom>> =
+        let contents: Vec<AnonymousTableContent<'dom, T>> =
             self.anonymous_table_content.drain(..).collect();
         let last_text = match contents.last() {
             Some(AnonymousTableContent::Text(info, text)) => Some((info.clone(), text.clone())),
@@ -325,10 +338,13 @@ impl<'dom, 'style> BlockContainerBuilder<'dom, 'style> {
     }
 }
 
-impl<'dom> TraversalHandler<'dom> for BlockContainerBuilder<'dom, '_> {
+impl<'dom, T> TraversalHandler<'dom, T> for BlockContainerBuilder<'dom, '_, T>
+where
+    T: LayoutNode<'dom> + LayoutNodeExt<'dom> + NodeExt<'dom>,
+{
     fn handle_element(
         &mut self,
-        info: &NodeAndStyleInfo<'dom>,
+        info: &NodeAndStyleInfo<'dom, T>,
         display: DisplayGeneratingBox,
         contents: Contents,
         box_slot: BoxSlot<'dom>,
@@ -369,7 +385,7 @@ impl<'dom> TraversalHandler<'dom> for BlockContainerBuilder<'dom, '_> {
         }
     }
 
-    fn handle_text(&mut self, info: &NodeAndStyleInfo<'dom>, text: Cow<'dom, str>) {
+    fn handle_text(&mut self, info: &NodeAndStyleInfo<'dom, T>, text: Cow<'dom, str>) {
         if text.is_empty() {
             return;
         }
@@ -404,11 +420,14 @@ impl<'dom> TraversalHandler<'dom> for BlockContainerBuilder<'dom, '_> {
     }
 }
 
-impl<'dom> BlockContainerBuilder<'dom, '_> {
+impl<'dom, T> BlockContainerBuilder<'dom, '_, T>
+where
+    T: LayoutNode<'dom> + NodeExt<'dom> + LayoutNodeExt<'dom>,
+{
     fn handle_list_item_marker_inside(
         &mut self,
-        marker_info: &NodeAndStyleInfo<'dom>,
-        container_info: &NodeAndStyleInfo<'dom>,
+        marker_info: &NodeAndStyleInfo<'dom, T>,
+        container_info: &NodeAndStyleInfo<'dom, T>,
         contents: Vec<crate::dom_traversal::PseudoElementContentItem>,
     ) {
         // TODO: We do not currently support saving box slots for ::marker pseudo-elements
@@ -433,8 +452,8 @@ impl<'dom> BlockContainerBuilder<'dom, '_> {
 
     fn handle_list_item_marker_outside(
         &mut self,
-        marker_info: &NodeAndStyleInfo<'dom>,
-        container_info: &NodeAndStyleInfo<'dom>,
+        marker_info: &NodeAndStyleInfo<'dom, T>,
+        container_info: &NodeAndStyleInfo<'dom, T>,
         contents: Vec<crate::dom_traversal::PseudoElementContentItem>,
         list_item_style: Arc<ComputedValues>,
     ) {
@@ -461,7 +480,7 @@ impl<'dom> BlockContainerBuilder<'dom, '_> {
 
     fn handle_inline_level_element(
         &mut self,
-        info: &NodeAndStyleInfo<'dom>,
+        info: &NodeAndStyleInfo<'dom, T>,
         display_inside: DisplayInside,
         contents: Contents,
         box_slot: BoxSlot<'dom>,
@@ -530,7 +549,7 @@ impl<'dom> BlockContainerBuilder<'dom, '_> {
 
     fn handle_block_level_element(
         &mut self,
-        info: &NodeAndStyleInfo<'dom>,
+        info: &NodeAndStyleInfo<'dom, T>,
         display_inside: DisplayInside,
         contents: Contents,
         box_slot: BoxSlot<'dom>,
@@ -600,7 +619,7 @@ impl<'dom> BlockContainerBuilder<'dom, '_> {
 
     fn handle_absolutely_positioned_element(
         &mut self,
-        info: &NodeAndStyleInfo<'dom>,
+        info: &NodeAndStyleInfo<'dom, T>,
         display_inside: DisplayInside,
         contents: Contents,
         box_slot: BoxSlot<'dom>,
@@ -637,7 +656,7 @@ impl<'dom> BlockContainerBuilder<'dom, '_> {
 
     fn handle_float_element(
         &mut self,
-        info: &NodeAndStyleInfo<'dom>,
+        info: &NodeAndStyleInfo<'dom, T>,
         display_inside: DisplayInside,
         contents: Contents,
         box_slot: BoxSlot<'dom>,
@@ -705,7 +724,10 @@ impl<'dom> BlockContainerBuilder<'dom, '_> {
     }
 }
 
-impl BlockLevelJob<'_> {
+impl<'dom, T> BlockLevelJob<'dom, T>
+where
+    T: LayoutNode<'dom> + NodeExt<'dom> + LayoutNodeExt<'dom>
+{
     fn finish(self, context: &LayoutContext) -> ArcRefCell<BlockLevelBox> {
         let info = &self.info;
 
@@ -799,7 +821,10 @@ impl BlockLevelJob<'_> {
 }
 
 impl IntermediateBlockContainer {
-    fn finish(self, context: &LayoutContext, info: &NodeAndStyleInfo<'_>) -> BlockContainer {
+    fn finish<'dom, T>(self, context: &LayoutContext, info: &NodeAndStyleInfo<'dom, T>) -> BlockContainer
+    where
+        T: LayoutNode<'dom> + NodeExt<'dom> + LayoutNodeExt<'dom>
+    {
         match self {
             IntermediateBlockContainer::Deferred {
                 contents,

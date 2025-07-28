@@ -44,7 +44,10 @@ pub(crate) struct InlineBox {
 }
 
 impl InlineBox {
-    pub(crate) fn new(info: &NodeAndStyleInfo) -> Self {
+    pub(crate) fn new<'dom, T>(info: &NodeAndStyleInfo<'dom, T>) -> Self
+    where
+        T: LayoutNode<'dom>,
+    {
         Self {
             base: LayoutBoxBase::new(info.into(), info.style.clone()),
             shared_inline_styles: info.into(),

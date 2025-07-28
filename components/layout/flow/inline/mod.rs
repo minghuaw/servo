@@ -188,8 +188,11 @@ pub(crate) struct SharedInlineStyles {
     pub selected: SharedStyle,
 }
 
-impl From<&NodeAndStyleInfo<'_>> for SharedInlineStyles {
-    fn from(info: &NodeAndStyleInfo) -> Self {
+impl<'dom, T> From<&NodeAndStyleInfo<'dom, T>> for SharedInlineStyles
+where
+    T: LayoutNode<'dom>,
+{
+    fn from(info: &NodeAndStyleInfo<'dom, T>) -> Self {
         Self {
             style: SharedStyle::new(info.style.clone()),
             selected: SharedStyle::new(info.get_selected_style()),

@@ -12,9 +12,8 @@ use euclid::default::Size2D as UntypedSize2D;
 use layout_api::wrapper_traits::{LayoutNode, ThreadSafeLayoutElement, ThreadSafeLayoutNode};
 use layout_api::{LayoutElementType, LayoutNodeType};
 use malloc_size_of_derive::MallocSizeOf;
-use script::layout_dom::ServoLayoutNode;
+use script::layout_dom::{LayoutNodeExt, ServoLayoutNode};
 use servo_arc::Arc;
-use style::dom::{NodeInfo, TNode};
 use style::properties::ComputedValues;
 use style::values::computed::Overflow;
 use style_traits::CSSPixel;
@@ -132,7 +131,7 @@ impl BoxTree {
         dirty_root_from_script: T,
     ) -> bool 
     where 
-        T: LayoutNode<'dom> + NodeExt<'dom>,
+        T: LayoutNode<'dom> + NodeExt<'dom> + LayoutNodeExt<'dom>,
     {
         let Some(box_tree_update) = IncrementalBoxTreeUpdate::find(dirty_root_from_script) else {
             return false;
@@ -273,10 +272,7 @@ enum DirtyRootBoxTreeNode {
 
 // }
 
-struct IncrementalBoxTreeUpdate<'dom, T> 
-where 
-    T: LayoutNode<'dom>,
-{
+struct IncrementalBoxTreeUpdate<'dom, T> {
     node: T,
     lt_marker: PhantomData<&'dom ()>,
     box_tree_node: DirtyRootBoxTreeNode,
@@ -284,9 +280,9 @@ where
     display_inside: DisplayInside,
 }
 
-impl<'dom, T> IncrementalBoxTreeUpdate<'dom, T> 
-where 
-    T: LayoutNode<'dom> + NodeExt<'dom>,
+impl<'dom, T> IncrementalBoxTreeUpdate<'dom, T>
+where
+    T: LayoutNode<'dom> + NodeExt<'dom> + LayoutNodeExt<'dom>,
 {
     fn find(dirty_root_from_script: T) -> Option<Self> {
         let mut maybe_dirty_root_node = Some(dirty_root_from_script);

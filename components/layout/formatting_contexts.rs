@@ -3,8 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use app_units::Au;
+use layout_api::wrapper_traits::LayoutNode;
 use malloc_size_of_derive::MallocSizeOf;
-use script::layout_dom::{ServoLayoutElement, ServoLayoutNode};
+use script::layout_dom::{LayoutNodeExt, ServoLayoutElement, ServoLayoutNode};
 use servo_arc::Arc;
 use style::context::SharedStyleContext;
 use style::logical_geometry::Direction;
@@ -12,6 +13,7 @@ use style::properties::ComputedValues;
 use style::selector_parser::PseudoElement;
 
 use crate::context::LayoutContext;
+use crate::dom::NodeExt;
 use crate::dom_traversal::{Contents, NodeAndStyleInfo};
 use crate::flexbox::FlexContainer;
 use crate::flow::BlockFormattingContext;
@@ -72,13 +74,16 @@ impl Baselines {
 }
 
 impl IndependentFormattingContext {
-    pub fn construct(
+    pub fn construct<'dom, T>(
         context: &LayoutContext,
-        node_and_style_info: &NodeAndStyleInfo,
+        node_and_style_info: &NodeAndStyleInfo<'dom, T>,
         display_inside: DisplayInside,
         contents: Contents,
         propagated_data: PropagatedBoxTreeData,
-    ) -> Self {
+    ) -> Self 
+    where
+        T: LayoutNode<'dom> + LayoutNodeExt<'dom> + NodeExt<'dom>,
+    {
         let mut base_fragment_info: BaseFragmentInfo = node_and_style_info.into();
 
         match contents {
