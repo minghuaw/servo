@@ -365,16 +365,16 @@ pub struct TableCaption {
 
 /// A calculated collapsed border.
 #[derive(Clone, Debug, Default, MallocSizeOf, PartialEq)]
-pub(crate) struct CollapsedBorder {
+pub struct CollapsedBorder {
     pub style_color: BorderStyleColor,
     pub width: Au,
 }
 
 /// Represents a piecewise sequence of collapsed borders along a line.
-pub(crate) type CollapsedBorderLine = Vec<CollapsedBorder>;
+pub type CollapsedBorderLine = Vec<CollapsedBorder>;
 
 #[derive(Clone, Debug, MallocSizeOf)]
-pub(crate) struct SpecificTableGridInfo {
+pub struct SpecificTableGridInfo {
     pub collapsed_borders: PhysicalVec<Vec<CollapsedBorderLine>>,
     pub track_sizes: PhysicalVec<Vec<Au>>,
 }

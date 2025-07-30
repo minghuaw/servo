@@ -26,7 +26,7 @@ use crate::geom::{LogicalSides, PhysicalPoint, PhysicalRect};
 use crate::style_ext::ComputedValuesExt;
 
 #[derive(Clone, MallocSizeOf)]
-pub(crate) enum Fragment {
+pub enum Fragment {
     Box(ArcRefCell<BoxFragment>),
     /// Floating content. A floated fragment is very similar to a normal
     /// [BoxFragment] but it isn't positioned using normal in block flow
@@ -49,20 +49,20 @@ pub(crate) enum Fragment {
 }
 
 #[derive(Clone, MallocSizeOf)]
-pub(crate) struct CollapsedBlockMargins {
+pub struct CollapsedBlockMargins {
     pub collapsed_through: bool,
     pub start: CollapsedMargin,
     pub end: CollapsedMargin,
 }
 
 #[derive(Clone, Copy, Debug, MallocSizeOf)]
-pub(crate) struct CollapsedMargin {
+pub struct CollapsedMargin {
     max_positive: Au,
     min_negative: Au,
 }
 
 #[derive(MallocSizeOf)]
-pub(crate) struct TextFragment {
+pub struct TextFragment {
     pub base: BaseFragment,
     pub inline_styles: SharedInlineStyles,
     pub rect: PhysicalRect<Au>,
@@ -77,7 +77,7 @@ pub(crate) struct TextFragment {
 }
 
 #[derive(MallocSizeOf)]
-pub(crate) struct ImageFragment {
+pub struct ImageFragment {
     pub base: BaseFragment,
     pub style: ServoArc<ComputedValues>,
     pub rect: PhysicalRect<Au>,
@@ -86,7 +86,7 @@ pub(crate) struct ImageFragment {
 }
 
 #[derive(MallocSizeOf)]
-pub(crate) struct IFrameFragment {
+pub struct IFrameFragment {
     pub base: BaseFragment,
     pub pipeline_id: PipelineId,
     pub rect: PhysicalRect<Au>,

@@ -93,7 +93,7 @@ impl NaturalSizes {
 }
 
 #[derive(Debug, MallocSizeOf)]
-pub(crate) struct CanvasInfo {
+pub struct CanvasInfo {
     pub source: Option<ImageKey>,
 }
 

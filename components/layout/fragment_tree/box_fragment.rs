@@ -29,7 +29,7 @@ use crate::taffy::SpecificTaffyGridInfo;
 
 /// Describes how a [`BoxFragment`] paints its background.
 #[derive(MallocSizeOf)]
-pub(crate) enum BackgroundMode {
+pub enum BackgroundMode {
     /// Draw the normal [`BoxFragment`] background as well as the extra backgrounds
     /// based on the style and positioning rectangles in this data structure.
     Extra(Vec<ExtraBackground>),
@@ -41,13 +41,13 @@ pub(crate) enum BackgroundMode {
     Normal,
 }
 #[derive(MallocSizeOf)]
-pub(crate) struct ExtraBackground {
+pub struct ExtraBackground {
     pub style: SharedStyle,
     pub rect: PhysicalRect<Au>,
 }
 
 #[derive(Clone, Debug, MallocSizeOf)]
-pub(crate) enum SpecificLayoutInfo {
+pub enum SpecificLayoutInfo {
     Grid(Box<SpecificTaffyGridInfo>),
     TableCellWithCollapsedBorders,
     TableGridWithCollapsedBorders(Box<SpecificTableGridInfo>),
@@ -55,7 +55,7 @@ pub(crate) enum SpecificLayoutInfo {
 }
 
 #[derive(MallocSizeOf)]
-pub(crate) struct BlockLevelLayoutInfo {
+pub struct BlockLevelLayoutInfo {
     /// When the `clear` property is not set to `none`, it may introduce clearance.
     /// Clearance is some extra spacing that is added above the top margin,
     /// so that the element doesn't overlap earlier floats in the same BFC.
@@ -68,7 +68,7 @@ pub(crate) struct BlockLevelLayoutInfo {
 }
 
 #[derive(MallocSizeOf)]
-pub(crate) struct BoxFragment {
+pub struct BoxFragment {
     pub base: BaseFragment,
 
     pub style: ServoArc<ComputedValues>,

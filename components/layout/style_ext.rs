@@ -241,7 +241,7 @@ pub(crate) struct ContentBoxSizesAndPBM {
 }
 
 #[derive(Clone, Debug, MallocSizeOf, PartialEq)]
-pub(crate) struct BorderStyleColor {
+pub struct BorderStyleColor {
     pub style: BorderStyle,
     pub color: AbsoluteColor,
 }

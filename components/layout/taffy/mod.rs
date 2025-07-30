@@ -193,7 +193,7 @@ impl TaffyItemBox {
 
 /// Details from Taffy grid layout that will be stored
 #[derive(Clone, Debug, MallocSizeOf)]
-pub(crate) struct SpecificTaffyGridInfo {
+pub struct SpecificTaffyGridInfo {
     pub rows: SpecificTaffyGridTrackInfo,
     pub columns: SpecificTaffyGridTrackInfo,
 }
@@ -222,6 +222,6 @@ impl SpecificTaffyGridInfo {
 }
 
 #[derive(Clone, Debug, MallocSizeOf)]
-pub(crate) struct SpecificTaffyGridTrackInfo {
+pub struct SpecificTaffyGridTrackInfo {
     pub sizes: Box<[Au]>,
 }

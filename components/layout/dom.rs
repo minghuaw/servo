@@ -225,7 +225,7 @@ impl Drop for BoxSlot<'_> {
     }
 }
 
-pub(crate) trait NodeExt<'dom> {
+pub trait NodeExt<'dom> {
     /// Returns the image if it’s loaded, and its size in image pixels
     /// adjusted for `image_density`.
     fn as_image(&self) -> Option<(Option<Image>, PhysicalSize<f64>)>;

@@ -183,7 +183,7 @@ pub(crate) struct InlineFormattingContext {
 /// wrapped in [`SharedStyle`]. This allows updating the parent box tree element without
 /// updating every single descendant box tree node and fragment.
 #[derive(Clone, Debug, MallocSizeOf)]
-pub(crate) struct SharedInlineStyles {
+pub struct SharedInlineStyles {
     pub style: SharedStyle,
     pub selected: SharedStyle,
 }
