@@ -859,9 +859,26 @@ impl Fragment {
                     None => unreachable!("Found hoisted box with missing fragment."),
                 };
 
+                let for_non_absolute_descendants =
+                    containing_block_info.for_non_absolute_descendants;
+                let rect = containing_block_info
+                    .for_absolute_descendants
+                    .unwrap_or(containing_block_info.for_absolute_and_fixed_descendants)
+                    .rect
+                    .translate(shared_fragment.static_position_rect.origin.to_vector());
+
+                let for_absolute_descendants = containing_block_info
+                    .for_absolute_descendants
+                    .unwrap_or(containing_block_info.for_absolute_and_fixed_descendants)
+                    .new_replacing_rect(&rect);
+                let new_cb_info = containing_block_info.new_for_absolute_and_fixed_descendants(
+                    for_non_absolute_descendants,
+                    &for_absolute_descendants,
+                );
+
                 fragment_ref.build_stacking_context_tree(
                     stacking_context_tree,
-                    containing_block_info,
+                    &new_cb_info,
                     stacking_context,
                     StackingContextBuildMode::IncludeHoisted,
                     &Default::default(),
