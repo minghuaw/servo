@@ -38,7 +38,10 @@ pub(crate) fn encode_and_enqueue_a_chunk(
     log::debug!("encode_and_enqueue_a_chunk");
     let output = unsafe {
         let js_str = NonNull::new(ToString(*cx, chunk))
-            .ok_or_else(|| Error::Type("Converting to DOMString failed".to_owned()))?;
+            .ok_or_else(|| {
+                log::error!("ToString failed");
+                Error::JSFailed
+            })?;
         if JS_DeprecatedStringHasLatin1Chars(js_str.as_ptr()) {
             let s = latin1_to_string(*cx, js_str.as_ptr());
             log::debug!("latin1 s: {:?}", s);
