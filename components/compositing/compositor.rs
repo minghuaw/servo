@@ -1224,7 +1224,7 @@ impl IOCompositor {
         if self.rendering_context.size() == new_size {
             return;
         }
-
+        dbg!("Resizing rendering context from minibrowser");
         self.rendering_context.resize(new_size);
 
         let mut transaction = Transaction::new();

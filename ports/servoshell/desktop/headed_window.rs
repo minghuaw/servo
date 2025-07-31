@@ -62,6 +62,7 @@ pub struct Window {
     monitor: winit::monitor::MonitorHandle,
     webview_relative_mouse_point: Cell<Point2D<f32, DevicePixel>>,
     last_pressed: Cell<Option<(KeyboardEvent, Option<LogicalKey>)>>,
+    inner_size: Cell<PhysicalSize<u32>>,
     /// A map of winit's key codes to key values that are interpreted from
     /// winit's ReceivedChar events.
     keys_down: RefCell<HashMap<LogicalKey, Key>>,
@@ -73,7 +74,7 @@ pub struct Window {
     /// The `RenderingContext` of Servo itself. This is used to render Servo results
     /// temporarily until they can be blitted into the egui scene.
     rendering_context: Rc<OffscreenRenderingContext>,
-
+    window_rendering_context: Rc<WindowRenderingContext>,
     // Keep this as the last field of the struct to ensure that the rendering context is
     // dropped first.
     // (https://github.com/servo/servo/issues/36711)
@@ -165,6 +166,8 @@ impl Window {
             modifiers_state: Cell::new(ModifiersState::empty()),
             toolbar_height: Cell::new(Default::default()),
             rendering_context,
+            inner_size: Cell::new(inner_size),
+            window_rendering_context
         }
     }
 
@@ -676,6 +679,26 @@ impl WindowPortsMethods for Window {
                     winit::window::Theme::Light => Theme::Light,
                     winit::window::Theme::Dark => Theme::Dark,
                 });
+            },
+            WindowEvent::Resized(new_inner_size) => {
+                dbg!(&new_inner_size);
+
+
+                if self.inner_size.get() != new_inner_size {
+
+                    // let mut new_inner_size = new_inner_size;
+                    // new_inner_size.height = (new_inner_size.height as f32 - self.toolbar_height().0) as u32;
+                    // self.inner_size.set(new_inner_size);
+                    // let sz = Size2D::new(new_inner_size.width as f32, new_inner_size.height as f32);
+                    // webview.move_resize(euclid::Box2D::from_origin_and_size(Point2D::origin(),  sz));
+                    // `WebView::move_resize` was already called in `Minibrowser::update`.
+                    self.window_rendering_context.resize(new_inner_size);
+
+
+
+                }
+
+
             },
             WindowEvent::Ime(ime) => match ime {
                 Ime::Enabled => {

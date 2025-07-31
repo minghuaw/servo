@@ -415,6 +415,7 @@ impl Minibrowser {
                 let available_size = ui.available_size();
                 let size = Size2D::new(available_size.x, available_size.y) * scale;
                 let rect = Box2D::from_origin_and_size(Point2D::origin(), size);
+                dbg!("minibrowser update rect:",&size);
                 if rect != webview.rect() {
                     webview.move_resize(rect);
                     webview.resize(PhysicalSize::new(size.width as u32, size.height as u32))

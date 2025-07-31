@@ -715,7 +715,8 @@ impl ApplicationHandler<AppEvent> for App {
                     let response =
                         minibrowser.on_window_event(window.winit_window().unwrap(), state, event);
                     // Update minibrowser if there's resize event to sync up with window.
-                    if let WindowEvent::Resized(_) = event {
+                    if let WindowEvent::Resized(size) = event {
+                        dbg!("minibrowser_resize_event:",&size);
                         minibrowser.update(
                             &*window,
                             state,

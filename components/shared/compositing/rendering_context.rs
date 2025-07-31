@@ -171,6 +171,7 @@ impl SurfmanRenderingContext {
     }
 
     fn resize_surface(&self, size: PhysicalSize<u32>) -> Result<(), Error> {
+        dbg!("Surface man resizing");
         let size = Size2D::new(size.width as i32, size.height as i32);
         let device = &mut self.device.borrow_mut();
         let context = &mut self.context.borrow_mut();
@@ -756,6 +757,7 @@ impl RenderingContext for OffscreenRenderingContext {
     }
 
     fn resize(&self, new_size: PhysicalSize<u32>) {
+        dbg!("oofscreen resizing");
         let old_size = self.size.get();
         if old_size == new_size {
             return;
