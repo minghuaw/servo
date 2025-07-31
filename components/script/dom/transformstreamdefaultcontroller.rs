@@ -6,6 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use dom_struct::dom_struct;
+use encoding_rs::Decoder;
 use js::jsapi::{
     ExceptionStackBehavior, Heap, JS_IsExceptionPending, JS_SetPendingException, JSObject,
 };
@@ -28,6 +29,8 @@ use crate::dom::promise::Promise;
 use crate::dom::promisenativehandler::{Callback, PromiseNativeHandler};
 use crate::dom::textdecodercommon::TextDecoderCommon;
 use crate::dom::textdecoderstream::{decode_and_enqueue_a_chunk, flush_and_enqueue};
+use crate::dom::textencodercommon::TextEncoderCommon;
+use crate::dom::textencoderstream::{encode_and_enqueue_a_chunk, encode_and_flush};
 use crate::realms::{InRealm, enter_realm};
 use crate::script_runtime::{CanGc, JSContext as SafeJSContext};
 
@@ -75,6 +78,8 @@ pub(crate) enum TransformerType {
     ///
     /// <https://encoding.spec.whatwg.org/#textdecodercommon>
     Decoder(Rc<TextDecoderCommon>),
+    /// Algorithms supporting
+    Encoder(Rc<TextEncoderCommon>),
 }
 
 impl TransformerType {
@@ -256,6 +261,16 @@ impl TransformStreamDefaultController {
                         p
                     })
             },
+            TransformerType::Encoder(encoder) => {
+                encode_and_enqueue_a_chunk(cx, global, chunk, encoder, self, can_gc)
+                    .map(|_| Promise::new_resolved(global, cx, (), can_gc))
+                    .unwrap_or_else(|e| {
+                        let realm = enter_realm(self);
+                        let p = Promise::new_in_current_realm((&realm).into(), can_gc);
+                        p.reject_error(e, can_gc);
+                        p
+                    })
+            }
         };
 
         Ok(result)
@@ -311,6 +326,9 @@ impl TransformStreamDefaultController {
                 // Step 7.3 Return a promise resolved with undefined.
                 Promise::new_resolved(global, cx, (), can_gc)
             },
+            TransformerType::Encoder(_) => {
+                Promise::new_resolved(global, cx, (), can_gc)
+            }
         };
 
         Ok(result)
@@ -372,6 +390,16 @@ impl TransformStreamDefaultController {
                         let realm = enter_realm(self);
                         let p = Promise::new_in_current_realm((&realm).into(), can_gc);
                         // return a promise rejected with e.
+                        p.reject_error(e, can_gc);
+                        p
+                    })
+            },
+            TransformerType::Encoder(encoder) => {
+                encode_and_flush(cx, global, encoder, self, can_gc)
+                    .map(|_| Promise::new_resolved(global, cx, (), can_gc))
+                    .unwrap_or_else(|e| {
+                        let realm = enter_realm(self);
+                        let p = Promise::new_in_current_realm((&realm).into(), can_gc);
                         p.reject_error(e, can_gc);
                         p
                     })
