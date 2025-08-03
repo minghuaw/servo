@@ -89,7 +89,7 @@ impl BlockContainer {
 }
 
 #[derive(Debug, MallocSizeOf)]
-pub(crate) enum BlockLevelBox {
+pub enum BlockLevelBox {
     Independent(IndependentFormattingContext),
     OutOfFlowAbsolutelyPositionedBox(ArcRefCell<AbsolutelyPositionedBox>),
     OutOfFlowFloatBox(FloatBox),

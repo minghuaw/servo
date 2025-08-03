@@ -34,7 +34,7 @@ use crate::{
 
 /// <https://drafts.csswg.org/css-display/#independent-formatting-context>
 #[derive(Debug, MallocSizeOf)]
-pub(crate) struct IndependentFormattingContext {
+pub struct IndependentFormattingContext {
     pub base: LayoutBoxBase,
     pub contents: IndependentFormattingContextContents,
 }

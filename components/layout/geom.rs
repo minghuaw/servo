@@ -949,7 +949,7 @@ impl Size<Au> {
 /// Represents the sizing constraint that the preferred, min and max sizing properties
 /// impose on one axis.
 #[derive(Clone, Copy, Debug, MallocSizeOf, PartialEq)]
-pub(crate) enum SizeConstraint {
+pub enum SizeConstraint {
     /// Represents a definite preferred size, clamped by minimum and maximum sizes (if any).
     Definite(Au),
     /// Represents an indefinite preferred size that allows a range of values between

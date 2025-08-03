@@ -25,7 +25,7 @@ use crate::{ConstraintSpace, ContainingBlockSize};
 ///
 /// In the future, this will hold layout results to support incremental layout.
 #[derive(MallocSizeOf)]
-pub(crate) struct LayoutBoxBase {
+pub struct LayoutBoxBase {
     pub base_fragment_info: BaseFragmentInfo,
     pub style: Arc<ComputedValues>,
     pub cached_inline_content_size:

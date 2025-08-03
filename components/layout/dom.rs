@@ -35,19 +35,19 @@ use crate::taffy::TaffyItemBox;
 
 #[derive(MallocSizeOf)]
 pub struct PseudoLayoutData {
-    pseudo: PseudoElement,
-    box_slot: ArcRefCell<Option<LayoutBox>>,
+    pub pseudo: PseudoElement,
+    pub box_slot: ArcRefCell<Option<LayoutBox>>,
 }
 
 /// The data that is stored in each DOM node that is used by layout.
 #[derive(Default, MallocSizeOf)]
 pub struct InnerDOMLayoutData {
-    pub(super) self_box: ArcRefCell<Option<LayoutBox>>,
-    pub(super) pseudo_boxes: SmallVec<[PseudoLayoutData; 2]>,
+    pub self_box: ArcRefCell<Option<LayoutBox>>,
+    pub pseudo_boxes: SmallVec<[PseudoLayoutData; 2]>,
 }
 
 impl InnerDOMLayoutData {
-    pub(crate) fn for_pseudo(
+    pub fn for_pseudo(
         &self,
         pseudo_element: Option<PseudoElement>,
     ) -> Option<AtomicRef<Option<LayoutBox>>> {
@@ -67,7 +67,7 @@ impl InnerDOMLayoutData {
 
 /// A box that is stored in one of the `DOMLayoutData` slots.
 #[derive(MallocSizeOf)]
-pub(super) enum LayoutBox {
+pub enum LayoutBox {
     DisplayContents(SharedInlineStyles),
     BlockLevel(ArcRefCell<BlockLevelBox>),
     InlineLevel(Vec<ArcRefCell<InlineItem>>),
@@ -77,7 +77,7 @@ pub(super) enum LayoutBox {
 }
 
 impl LayoutBox {
-    fn clear_fragment_layout_cache(&self) {
+    pub fn clear_fragment_layout_cache(&self) {
         match self {
             LayoutBox::DisplayContents(..) => {},
             LayoutBox::BlockLevel(block_level_box) => {
@@ -98,7 +98,7 @@ impl LayoutBox {
         }
     }
 
-    pub(crate) fn fragments(&self) -> Vec<Fragment> {
+    pub fn fragments(&self) -> Vec<Fragment> {
         match self {
             LayoutBox::DisplayContents(..) => vec![],
             LayoutBox::BlockLevel(block_level_box) => block_level_box.borrow().fragments(),
@@ -112,7 +112,7 @@ impl LayoutBox {
         }
     }
 
-    fn repair_style(
+    pub fn repair_style(
         &self,
         context: &SharedStyleContext,
         node: &ServoLayoutNode,
@@ -166,7 +166,7 @@ impl LayoutBox {
 /// structure interior mutability, as we will need to mutate the layout data of
 /// non-mutable DOM nodes.
 #[derive(Default, MallocSizeOf)]
-pub struct DOMLayoutData(AtomicRefCell<InnerDOMLayoutData>);
+pub struct DOMLayoutData(pub AtomicRefCell<InnerDOMLayoutData>);
 
 // The implementation of this trait allows the data to be stored in the DOM.
 impl LayoutDataTrait for DOMLayoutData {}
