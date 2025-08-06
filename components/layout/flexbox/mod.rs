@@ -162,12 +162,15 @@ pub(crate) enum FlexLevelBox {
 }
 
 impl FlexLevelBox {
-    pub(crate) fn repair_style(
+    pub(crate) fn repair_style<'dom, T>(
         &mut self,
         context: &SharedStyleContext,
-        node: &ServoLayoutNode,
+        node: &T,
         new_style: &ServoArc<ComputedValues>,
-    ) {
+    ) 
+    where 
+        T: LayoutNode<'dom>,
+    {
         match self {
             FlexLevelBox::FlexItem(flex_item_box) => flex_item_box
                 .independent_formatting_context

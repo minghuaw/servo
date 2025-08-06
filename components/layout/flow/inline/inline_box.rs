@@ -74,11 +74,14 @@ impl InlineBox {
         LayoutStyle::Default(&self.base.style)
     }
 
-    pub(crate) fn repair_style(
+    pub(crate) fn repair_style<'dom, T>(
         &mut self,
-        node: &ServoLayoutNode,
+        node: &T,
         new_style: &ServoArc<ComputedValues>,
-    ) {
+    ) 
+    where
+        T: LayoutNode<'dom>
+    {
         self.base.repair_style(new_style);
         *self.shared_inline_styles.style.borrow_mut() = new_style.clone();
         *self.shared_inline_styles.selected.borrow_mut() = node.to_threadsafe().selected_style();

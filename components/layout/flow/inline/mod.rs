@@ -120,6 +120,7 @@ use super::{
 };
 use crate::cell::ArcRefCell;
 use crate::context::LayoutContext;
+use crate::dom::NodeExt;
 use crate::dom_traversal::NodeAndStyleInfo;
 use crate::flow::CollapsibleWithParentStartMargin;
 use crate::flow::float::{FloatBox, SequentialLayoutState};
@@ -226,12 +227,15 @@ pub(crate) enum InlineItem {
 }
 
 impl InlineItem {
-    pub(crate) fn repair_style(
+    pub(crate) fn repair_style<'dom, T>(
         &self,
         context: &SharedStyleContext,
-        node: &ServoLayoutNode,
+        node: &T,
         new_style: &Arc<ComputedValues>,
-    ) {
+    ) 
+    where 
+        T: LayoutNode<'dom> + NodeExt<'dom>,
+    {
         match self {
             InlineItem::StartInlineBox(inline_box) => {
                 inline_box.borrow_mut().repair_style(node, new_style);
@@ -1703,7 +1707,10 @@ impl InlineFormattingContext {
         }
     }
 
-    pub(crate) fn repair_style(&self, node: &ServoLayoutNode, new_style: &Arc<ComputedValues>) {
+    pub(crate) fn repair_style<'dom, T>(&self, node: &T, new_style: &Arc<ComputedValues>) 
+    where 
+        T: LayoutNode<'dom>,
+    {
         *self.shared_inline_styles.style.borrow_mut() = new_style.clone();
         *self.shared_inline_styles.selected.borrow_mut() = node.to_threadsafe().selected_style();
     }

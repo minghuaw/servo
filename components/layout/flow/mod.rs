@@ -7,6 +7,7 @@
 
 use app_units::{Au, MAX_AU};
 use inline::InlineFormattingContext;
+use layout_api::wrapper_traits::LayoutNode;
 use malloc_size_of_derive::MallocSizeOf;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use script::layout_dom::ServoLayoutNode;
@@ -78,7 +79,10 @@ impl BlockContainer {
         }
     }
 
-    pub(crate) fn repair_style(&mut self, node: &ServoLayoutNode, new_style: &Arc<ComputedValues>) {
+    pub(crate) fn repair_style<'dom, T>(&mut self, node: &T, new_style: &Arc<ComputedValues>) 
+    where 
+        T: LayoutNode<'dom>,
+    {
         match self {
             BlockContainer::BlockLevelBoxes(..) => {},
             BlockContainer::InlineFormattingContext(inline_formatting_context) => {
@@ -102,12 +106,15 @@ pub enum BlockLevelBox {
 }
 
 impl BlockLevelBox {
-    pub(crate) fn repair_style(
+    pub(crate) fn repair_style<'dom, T>(
         &mut self,
         context: &SharedStyleContext,
-        node: &ServoLayoutNode,
+        node: &T,
         new_style: &Arc<ComputedValues>,
-    ) {
+    ) 
+    where 
+        T: LayoutNode<'dom> + NodeExt<'dom>,
+    {
         self.with_base_mut(|base| {
             base.repair_style(new_style);
         });
@@ -412,12 +419,15 @@ impl OutsideMarker {
         )))
     }
 
-    fn repair_style(
+    fn repair_style<'dom, T>(
         &mut self,
         context: &SharedStyleContext,
-        node: &ServoLayoutNode,
+        node: &T,
         new_style: &Arc<ComputedValues>,
-    ) {
+    ) 
+    where 
+        T: LayoutNode<'dom> + NodeExt<'dom>,
+    {
         self.list_item_style = node.style(context);
         self.base.repair_style(new_style);
     }
@@ -482,7 +492,10 @@ impl BlockFormattingContext {
         LayoutStyle::Default(&base.style)
     }
 
-    pub(crate) fn repair_style(&mut self, node: &ServoLayoutNode, new_style: &Arc<ComputedValues>) {
+    pub(crate) fn repair_style<'dom, T>(&mut self, node: &T, new_style: &Arc<ComputedValues>) 
+    where 
+        T: LayoutNode<'dom>,
+    {
         self.contents.repair_style(node, new_style);
     }
 }

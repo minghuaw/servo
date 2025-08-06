@@ -162,12 +162,15 @@ impl TaffyItemBox {
         }
     }
 
-    pub(crate) fn repair_style(
+    pub(crate) fn repair_style<'dom, T>(
         &mut self,
         context: &SharedStyleContext,
-        node: &ServoLayoutNode,
+        node: &T,
         new_style: &Arc<ComputedValues>,
-    ) {
+    ) 
+    where 
+        T: LayoutNode<'dom>,
+    {
         self.style = new_style.clone();
         match &mut self.taffy_level_box {
             TaffyItemBoxInner::InFlowBox(independent_formatting_context) => {

@@ -256,12 +256,15 @@ impl IndependentFormattingContext {
         }
     }
 
-    pub(crate) fn repair_style(
+    pub(crate) fn repair_style<'dom, T>(
         &mut self,
         context: &SharedStyleContext,
-        node: &ServoLayoutNode,
+        node: &T,
         new_style: &Arc<ComputedValues>,
-    ) {
+    ) 
+    where 
+        T: LayoutNode<'dom>,
+    {
         self.base.repair_style(new_style);
         match &mut self.contents {
             IndependentFormattingContextContents::NonReplaced(content) => {
@@ -425,12 +428,15 @@ impl IndependentNonReplacedContents {
         None
     }
 
-    fn repair_style(
+    fn repair_style<'dom, T>(
         &mut self,
         context: &SharedStyleContext,
-        node: &ServoLayoutNode,
+        node: &T,
         new_style: &Arc<ComputedValues>,
-    ) {
+    ) 
+    where 
+        T: LayoutNode<'dom>,
+    {
         match self {
             IndependentNonReplacedContents::Flow(block_formatting_context) => {
                 block_formatting_context.repair_style(node, new_style);

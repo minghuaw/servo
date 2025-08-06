@@ -112,12 +112,15 @@ impl LayoutBox {
         }
     }
 
-    pub fn repair_style(
+    pub fn repair_style<'dom, T>(
         &self,
         context: &SharedStyleContext,
-        node: &ServoLayoutNode,
+        node: &T,
         new_style: &ServoArc<ComputedValues>,
-    ) {
+    ) 
+    where 
+        T: LayoutNode<'dom> + NodeExt<'dom>,
+    {
         match self {
             LayoutBox::DisplayContents(inline_shared_styles) => {
                 *inline_shared_styles.style.borrow_mut() = new_style.clone();

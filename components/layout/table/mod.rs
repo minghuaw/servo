@@ -75,6 +75,7 @@ use atomic_refcell::AtomicRef;
 pub(crate) use construct::AnonymousTableContent;
 pub use construct::TableBuilder;
 use euclid::{Point2D, Size2D, UnknownUnit, Vector2D};
+use layout_api::wrapper_traits::LayoutNode;
 use malloc_size_of_derive::MallocSizeOf;
 use script::layout_dom::{ServoLayoutElement, ServoLayoutNode};
 use servo_arc::Arc;
@@ -422,12 +423,15 @@ impl TableLevelBox {
         }
     }
 
-    pub(crate) fn repair_style(
+    pub(crate) fn repair_style<'dom, T>(
         &self,
         context: &SharedStyleContext<'_>,
-        node: &ServoLayoutNode,
+        node: &T,
         new_style: &Arc<ComputedValues>,
-    ) {
+    ) 
+    where 
+        T: LayoutNode<'dom>
+    {
         match self {
             TableLevelBox::Caption(caption) => caption
                 .borrow_mut()
