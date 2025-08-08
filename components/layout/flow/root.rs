@@ -47,7 +47,10 @@ pub struct BoxTree {
 
 impl BoxTree {
     #[servo_tracing::instrument(name = "Box Tree Construction", skip_all)]
-    pub(crate) fn construct(context: &LayoutContext, root_element: ServoLayoutNode<'_>) -> Self {
+    pub fn construct<'dom, T>(context: &LayoutContext, root_element: T) -> Self 
+    where 
+        T: LayoutNode<'dom> + NodeExt<'dom> + LayoutNodeExt<'dom>,
+    {
         let boxes = construct_for_root_element(context, root_element);
 
         // Zero box for `:root { display: none }`, one for the root element otherwise.
@@ -125,7 +128,7 @@ impl BoxTree {
     /// * how intrinsic content sizes are computed eagerly makes it hard
     ///   to update those sizes for ancestors of the node from which we
     ///   made an incremental update.
-    pub(crate) fn update<'dom, T>(
+    pub fn update<'dom, T>(
         context: &LayoutContext,
         // dirty_root_from_script: ServoLayoutNode<'_>,
         dirty_root_from_script: T,
@@ -141,10 +144,13 @@ impl BoxTree {
     }
 }
 
-fn construct_for_root_element(
+fn construct_for_root_element<'dom, T>(
     context: &LayoutContext,
-    root_element: ServoLayoutNode<'_>,
-) -> Vec<ArcRefCell<BlockLevelBox>> {
+    root_element: T,
+) -> Vec<ArcRefCell<BlockLevelBox>> 
+where 
+    T: LayoutNode<'dom> + NodeExt<'dom> + LayoutNodeExt<'dom>
+{
     let info = NodeAndStyleInfo::new(
         root_element,
         root_element.style(&context.style_context),

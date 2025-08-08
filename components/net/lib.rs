@@ -20,7 +20,7 @@ pub mod local_directory_listing;
 pub mod protocols;
 pub mod request_interceptor;
 pub mod resource_thread;
-mod storage_thread;
+pub mod storage_thread;
 pub mod subresource_integrity;
 mod websocket_loader;
 

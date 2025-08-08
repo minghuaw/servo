@@ -1235,7 +1235,7 @@ fn create_sandbox() {
     panic!("Sandboxing is not supported on Windows, iOS, ARM targets and android.");
 }
 
-struct DefaultEventLoopWaker;
+pub struct DefaultEventLoopWaker;
 
 impl EventLoopWaker for DefaultEventLoopWaker {
     fn clone_box(&self) -> Box<dyn EventLoopWaker> {

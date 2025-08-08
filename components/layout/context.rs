@@ -25,7 +25,7 @@ use webrender_api::units::{DeviceIntSize, DeviceSize};
 
 pub(crate) type CachedImageOrError = Result<CachedImage, ResolveImageError>;
 
-pub(crate) struct LayoutContext<'a> {
+pub struct LayoutContext<'a> {
     pub use_rayon: bool,
 
     /// Bits shared by the layout and style system.
@@ -72,7 +72,7 @@ pub(crate) enum LayoutImageCacheResult {
     LoadError,
 }
 
-pub(crate) struct ImageResolver {
+pub struct ImageResolver {
     /// The origin of the `Document` that this [`ImageResolver`] resolves images for.
     pub origin: ImmutableOrigin,
 
