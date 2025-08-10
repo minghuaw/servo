@@ -336,7 +336,7 @@ impl LineItemLayout<'_, '_> {
 
         let parent_offset = LogicalVec2 {
             inline: self.current_state.inline_advance + self.current_state.parent_offset.inline,
-            block: block_start_offset,
+            block: block_start_offset + space_above_baseline, // TODO: check if space_above_baseline should be added here
         };
 
         let outer_state = std::mem::replace(
