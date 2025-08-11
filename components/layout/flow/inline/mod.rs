@@ -913,7 +913,8 @@ impl InlineFormattingContextLayout<'_> {
 
         let effective_block_advance = if self.current_line.has_content ||
             had_inline_advance ||
-            self.linebreak_before_new_content
+            self.linebreak_before_new_content ||
+            !self.current_line.line_items.is_empty()
         {
             self.current_line_max_block_size_including_nested_containers()
         } else {
