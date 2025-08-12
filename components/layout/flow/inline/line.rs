@@ -324,7 +324,12 @@ impl LineItemLayout<'_, '_> {
         let inline_box = self.layout.ifc.inline_boxes.get(identifier);
         let inline_box = &*(inline_box.borrow());
 
-        let space_above_baseline = inline_box_state.calculate_space_above_baseline();
+        let has_content = *inline_box_state.base.has_content.borrow();
+        let space_above_baseline = if has_content {
+            inline_box_state.calculate_space_above_baseline()
+        } else {
+            Au::zero()
+        };
         let block_start_offset =
             self.calculate_inline_box_block_start(inline_box_state, space_above_baseline);
 

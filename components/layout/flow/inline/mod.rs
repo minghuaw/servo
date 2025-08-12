@@ -1543,7 +1543,7 @@ impl InlineFormattingContextLayout<'_> {
         // The line segments might have no items and have content after processing a forced
         // linebreak on an empty line.
         let segment_items_is_empty = self.current_line_segment.line_items.is_empty();
-        if segment_items_is_empty && !self.current_line_segment.has_content
+        if self.current_line_segment.line_items.is_empty() && !self.current_line_segment.has_content
         {
             return;
         }
