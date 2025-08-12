@@ -1542,7 +1542,6 @@ impl InlineFormattingContextLayout<'_> {
     fn commit_current_segment_to_line(&mut self) {
         // The line segments might have no items and have content after processing a forced
         // linebreak on an empty line.
-        let segment_items_is_empty = self.current_line_segment.line_items.is_empty();
         if self.current_line_segment.line_items.is_empty() && !self.current_line_segment.has_content
         {
             return;
@@ -1583,7 +1582,7 @@ impl InlineFormattingContextLayout<'_> {
         }
 
         self.current_line.line_items.extend(segment_items);
-        self.current_line.has_content |= self.current_line_segment.has_content || !segment_items_is_empty;
+        self.current_line.has_content |= self.current_line_segment.has_content;
 
         self.current_line_segment.reset();
     }
