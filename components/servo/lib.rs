@@ -219,7 +219,7 @@ pub struct Servo {
 }
 
 #[derive(Clone)]
-struct RenderNotifier {
+pub struct RenderNotifier {
     compositor_proxy: CompositorProxy,
 }
 
@@ -1025,7 +1025,7 @@ fn create_embedder_channel(
     )
 }
 
-fn create_compositor_channel(
+pub fn create_compositor_channel(
     event_loop_waker: Box<dyn EventLoopWaker>,
 ) -> (CompositorProxy, Receiver<CompositorMsg>) {
     let (sender, receiver) = unbounded();
@@ -1052,7 +1052,7 @@ fn create_compositor_channel(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn create_constellation(
+pub fn create_constellation(
     config_dir: Option<PathBuf>,
     embedder_proxy: EmbedderProxy,
     compositor_proxy: CompositorProxy,

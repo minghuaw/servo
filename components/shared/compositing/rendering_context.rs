@@ -678,7 +678,7 @@ pub struct OffscreenRenderingContext {
 type RenderToParentCallback = Box<dyn Fn(&glow::Context, Rect<i32>) + Send + Sync>;
 
 impl OffscreenRenderingContext {
-    fn new(parent_context: Rc<WindowRenderingContext>, size: PhysicalSize<u32>) -> Self {
+    pub fn new(parent_context: Rc<WindowRenderingContext>, size: PhysicalSize<u32>) -> Self {
         let framebuffer = RefCell::new(Framebuffer::new(parent_context.gleam_gl_api(), size));
         Self {
             parent_context,
