@@ -1289,7 +1289,7 @@ impl RegisteredSpeculativePainters for RegisteredPaintersImpl {
     }
 }
 
-struct LayoutFontMetricsProvider(Arc<FontContext>);
+pub struct LayoutFontMetricsProvider(pub Arc<FontContext>);
 
 impl FontMetricsProvider for LayoutFontMetricsProvider {
     fn query_font_metrics(

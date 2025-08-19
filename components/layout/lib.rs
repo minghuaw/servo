@@ -44,6 +44,7 @@ use style::properties::ComputedValues;
 
 use crate::geom::{LogicalVec2, SizeConstraint};
 use crate::style_ext::AspectRatio;
+pub use crate::layout_impl::LayoutFontMetricsProvider;
 
 /// At times, a style is "owned" by more than one layout object. For example, text
 /// fragments need a handle on their parent inline box's style. In order to make
