@@ -208,7 +208,7 @@ where
 
 impl BoxTree {
     #[servo_tracing::instrument(name = "Fragment Tree Construction", skip_all)]
-    pub(crate) fn layout(
+    pub fn layout(
         &self,
         layout_context: &LayoutContext,
         viewport: UntypedSize2D<Au>,

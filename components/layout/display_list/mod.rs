@@ -62,7 +62,7 @@ use crate::replaced::NaturalSizes;
 use crate::style_ext::{BorderStyleColor, ComputedValuesExt};
 
 mod background;
-mod clip;
+pub mod clip;
 mod conversions;
 mod gradient;
 mod stacking_context;
@@ -75,23 +75,23 @@ type ItemTag = (u64, u16);
 type HitInfo = Option<ItemTag>;
 const INSERTION_POINT_LOGICAL_WIDTH: Au = Au(AU_PER_PX);
 
-pub(crate) struct DisplayListBuilder<'a> {
+pub struct DisplayListBuilder<'a> {
     /// The current [ScrollTreeNodeId] for this [DisplayListBuilder]. This
     /// allows only passing the builder instead passing the containing
     /// [stacking_context::StackingContextContent::Fragment] as an argument to display
     /// list building functions.
-    current_scroll_node_id: ScrollTreeNodeId,
+    pub current_scroll_node_id: ScrollTreeNodeId,
 
     /// The current [ScrollTreeNodeId] for this [DisplayListBuilder]. This is necessary in addition
     /// to the [Self::current_scroll_node_id], because some pieces of fragments as backgrounds with
     /// `background-attachment: fixed` need to not scroll while the rest of the fragment does.
-    current_reference_frame_scroll_node_id: ScrollTreeNodeId,
+    pub current_reference_frame_scroll_node_id: ScrollTreeNodeId,
 
     /// The current [`ClipId`] for this [DisplayListBuilder]. This allows
     /// only passing the builder instead passing the containing
     /// [stacking_context::StackingContextContent::Fragment] as an argument to display
     /// list building functions.
-    current_clip_id: ClipId,
+    pub current_clip_id: ClipId,
 
     /// The [`wr::DisplayListBuilder`] for this Servo [`DisplayListBuilder`].
     pub webrender_display_list_builder: &'a mut wr::DisplayListBuilder,
@@ -103,47 +103,47 @@ pub(crate) struct DisplayListBuilder<'a> {
     ///
     /// This data is collected during the traversal of the fragment tree and used
     /// to paint the highlight at the very end.
-    inspector_highlight: Option<InspectorHighlight>,
+    pub inspector_highlight: Option<InspectorHighlight>,
 
     /// Whether or not the `<body>` element should be painted. This is false if the root `<html>`
     /// element inherits the `<body>`'s background to paint the page canvas background.
     /// See <https://drafts.csswg.org/css-backgrounds/#body-background>.
-    paint_body_background: bool,
+    pub paint_body_background: bool,
 
     /// A mapping from [`ClipId`] To WebRender [`ClipChainId`] used when building this WebRender
     /// display list.
-    clip_map: Vec<ClipChainId>,
+    pub clip_map: Vec<ClipChainId>,
 
     /// An [`ImageResolver`] to use during display list construction.
-    image_resolver: Arc<ImageResolver>,
+    pub image_resolver: Arc<ImageResolver>,
 
     /// The device pixel ratio used for this `Document`'s display list.
-    device_pixel_ratio: Scale<f32, StyloCSSPixel, StyloDevicePixel>,
+    pub device_pixel_ratio: Scale<f32, StyloCSSPixel, StyloDevicePixel>,
 }
 
-struct InspectorHighlight {
+pub struct InspectorHighlight {
     /// The node that should be highlighted
-    tag: Tag,
+    pub tag: Tag,
 
     /// Accumulates information about the fragments that belong to the highlighted node.
     ///
     /// This information is collected as the fragment tree is traversed to build the
     /// display list.
-    state: Option<HighlightTraversalState>,
+    pub state: Option<HighlightTraversalState>,
 }
 
-struct HighlightTraversalState {
+pub struct HighlightTraversalState {
     /// The smallest rectangle that fully encloses all fragments created by the highlighted
     /// dom node, if any.
-    content_box: euclid::Rect<Au, StyloCSSPixel>,
+    pub content_box: euclid::Rect<Au, StyloCSSPixel>,
 
-    spatial_id: SpatialId,
+    pub spatial_id: SpatialId,
 
-    clip_chain_id: ClipChainId,
+    pub clip_chain_id: ClipChainId,
 
     /// When the highlighted fragment is a box fragment we remember the information
     /// needed to paint padding, border and margin areas.
-    maybe_box_fragment: Option<ArcRefCell<BoxFragment>>,
+    pub maybe_box_fragment: Option<ArcRefCell<BoxFragment>>,
 }
 
 impl InspectorHighlight {
@@ -242,7 +242,7 @@ impl DisplayListBuilder<'_> {
         }
     }
 
-    pub(crate) fn add_all_spatial_nodes(&mut self) {
+    pub fn add_all_spatial_nodes(&mut self) {
         // A count of the number of SpatialTree nodes pushed to the WebRender display
         // list. This is merely to ensure that the currently-unused SpatialTreeItemKey
         // produced for every SpatialTree node is unique.
@@ -320,7 +320,7 @@ impl DisplayListBuilder<'_> {
     ///    for things such as `overflow: scroll` elements.
     ///  - When a clip is added during WebRender display list construction for individual
     ///    items. In that case, this is called by [`Self::maybe_create_clip`].
-    pub(crate) fn add_clip_to_display_list(&mut self, clip: &Clip) -> ClipChainId {
+    pub fn add_clip_to_display_list(&mut self, clip: &Clip) -> ClipChainId {
         assert_eq!(
             clip.id.0,
             self.clip_map.len(),
@@ -416,7 +416,7 @@ impl DisplayListBuilder<'_> {
     }
 
     /// Draw highlights around the node that is currently hovered in the devtools.
-    fn paint_dom_inspector_highlight(&mut self) {
+    pub fn paint_dom_inspector_highlight(&mut self) {
         let Some(highlight) = self
             .inspector_highlight
             .take()

@@ -99,7 +99,7 @@ pub(crate) enum StackingContextSection {
     Outline,
 }
 
-pub(crate) struct StackingContextTree {
+pub struct StackingContextTree {
     /// The root stacking context of this [`StackingContextTree`].
     pub root_stacking_context: StackingContext,
 
@@ -573,7 +573,7 @@ impl StackingContext {
     /// <https://drafts.csswg.org/css-backgrounds/#special-backgrounds>
     ///
     /// This is only called for the root `StackingContext`
-    pub(crate) fn build_canvas_background_display_list(
+    pub fn build_canvas_background_display_list(
         &self,
         builder: &mut DisplayListBuilder,
         fragment_tree: &crate::FragmentTree,
@@ -647,7 +647,7 @@ impl StackingContext {
         fragment_builder.build_background_image(builder, &painter);
     }
 
-    pub(crate) fn build_display_list(&self, builder: &mut DisplayListBuilder) {
+    pub fn build_display_list(&self, builder: &mut DisplayListBuilder) {
         let pushed_context = self.push_webrender_stacking_context_if_necessary(builder);
 
         // Properly order display items that make up a stacking context.

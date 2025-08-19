@@ -17,18 +17,18 @@ use super::{BuilderForBoxFragment, compute_margin_box_radius, normalize_radii};
 /// An identifier for a clip used during StackingContextTree construction. This is a simple index in
 /// a [`ClipStore`]s vector of clips.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct ClipId(pub usize);
+pub struct ClipId(pub usize);
 
 impl ClipId {
     /// Equivalent to [`ClipChainId::INVALID`]. This means "no clip."
-    pub(crate) const INVALID: ClipId = ClipId(usize::MAX);
+    pub const INVALID: ClipId = ClipId(usize::MAX);
 }
 
 /// All the information needed to create a clip on a WebRender display list. These are created at
 /// two times: during `StackingContextTree` creation and during WebRender display list construction.
 /// Only the former are stored in a [`ClipStore`].
 #[derive(Clone)]
-pub(crate) struct Clip {
+pub struct Clip {
     pub id: ClipId,
     pub radii: BorderRadius,
     pub rect: LayoutRect,
@@ -40,7 +40,7 @@ pub(crate) struct Clip {
 /// These are later turned into WebRender clips and clip chains during WebRender display
 /// list construction.
 #[derive(Clone, Default)]
-pub(crate) struct StackingContextTreeClipStore(pub Vec<Clip>);
+pub struct StackingContextTreeClipStore(pub Vec<Clip>);
 
 impl StackingContextTreeClipStore {
     pub(crate) fn add(

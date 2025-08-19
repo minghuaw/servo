@@ -108,7 +108,7 @@ impl FragmentTree {
 
     /// Calculate the scrollable overflow / scrolling area for this [`FragmentTree`] according
     /// to <https://drafts.csswg.org/cssom-view/#scrolling-area>.
-    pub(crate) fn calculate_scrollable_overflow(&self) {
+    pub fn calculate_scrollable_overflow(&self) {
         let scrollable_overflow = || {
             let Some(first_root_fragment) = self.root_fragments.first() else {
                 return self.initial_containing_block;
