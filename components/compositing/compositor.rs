@@ -111,10 +111,10 @@ pub struct ServoRenderer {
     time_profiler_chan: profile_time::ProfilerChan,
 
     /// The WebRender [`RenderApi`] interface used to communicate with WebRender.
-    pub(crate) webrender_api: RenderApi,
+    pub webrender_api: RenderApi,
 
     /// The active webrender document.
-    pub(crate) webrender_document: DocumentId,
+    pub webrender_document: DocumentId,
 
     /// The GL bindings for webrender
     webrender_gl: Rc<dyn gleam::gl::Gl>,
@@ -1814,5 +1814,10 @@ impl IOCompositor {
 
     fn shutdown_state(&self) -> ShutdownState {
         self.global.borrow().shutdown_state()
+    }
+
+    /// TODO: hack, make global pub
+    pub fn global(&self) -> Rc<RefCell<ServoRenderer>> {
+        self.global.clone()
     }
 }
