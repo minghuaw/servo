@@ -1019,7 +1019,7 @@ impl IOCompositor {
     }
 
     /// Queue a new frame in the transaction and increase the pending frames count.
-    pub(crate) fn generate_frame(&mut self, transaction: &mut Transaction, reason: RenderReasons) {
+    pub fn generate_frame(&mut self, transaction: &mut Transaction, reason: RenderReasons) {
         self.pending_frames += 1;
         transaction.generate_frame(0, true /* present */, reason);
     }
