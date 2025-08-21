@@ -111,10 +111,10 @@ pub struct ServoRenderer {
     time_profiler_chan: profile_time::ProfilerChan,
 
     /// The WebRender [`RenderApi`] interface used to communicate with WebRender.
-    pub webrender_api: RenderApi,
+    webrender_api: RenderApi,
 
     /// The active webrender document.
-    pub webrender_document: DocumentId,
+    webrender_document: DocumentId,
 
     /// The GL bindings for webrender
     webrender_gl: Rc<dyn gleam::gl::Gl>,
@@ -367,7 +367,7 @@ impl ServoRenderer {
         Ok(results)
     }
 
-    pub(crate) fn send_transaction(&mut self, transaction: Transaction) {
+    pub fn send_transaction(&mut self, transaction: Transaction) {
         self.webrender_api
             .send_transaction(self.webrender_document, transaction);
     }
