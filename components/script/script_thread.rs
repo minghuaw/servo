@@ -197,6 +197,8 @@ unsafe_no_jsmanaged_fields!(TaskQueue<MainThreadScriptMsg>);
 
 type NodeIdSet = HashSet<String>;
 
+static GLOBAL_FONT_CONTEXT: std::sync::OnceLock<Arc<FontContext>> = std::sync::OnceLock::new();
+
 /// A simple guard structure that restore the user interacting state when dropped
 #[derive(Default)]
 pub(crate) struct ScriptUserInteractingGuard {
@@ -3126,11 +3128,13 @@ impl ScriptThread {
             MutableOrigin::new(final_url.origin())
         };
 
-        let font_context = Arc::new(FontContext::new(
-            self.system_font_service.clone(),
-            self.paint_api.clone(),
-            self.resource_threads.clone(),
-        ));
+        let font_context = GLOBAL_FONT_CONTEXT.get_or_init(|| {
+            Arc::new(FontContext::new(
+                self.system_font_service.clone(),
+                self.paint_api.clone(),
+                self.resource_threads.clone(),
+            ))
+        }).clone();
 
         let image_cache = self.image_cache_factory.create(
             incomplete.webview_id,
