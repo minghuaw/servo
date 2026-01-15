@@ -1595,6 +1595,15 @@ impl InlineFormattingContextLayout<'_> {
         };
         self.update_unbreakable_segment_for_new_content(&strut_size, inline_advance, flags);
 
+        let selection_range = text_run.selection_range.as_ref().and_then(|selection| {
+            let intersection = selection.intersect(&range);
+            if range.contains_inclusive(selection.start) {
+                Some(intersection)
+            } else {
+                None
+            }
+        });
+
         let current_inline_box_identifier = self.current_inline_box_identifier();
         match self.current_line_segment.line_items.last_mut() {
             Some(LineItem::TextRun(inline_box_identifier, line_item))
@@ -1602,45 +1611,27 @@ impl InlineFormattingContextLayout<'_> {
                     line_item.can_merge(font_key, bidi_level) =>
             {
                 line_item.text.push(glyph_store);
+                if line_item.selection_range.is_none() {
+                    line_item.selection_range = selection_range;
+                };
                 return;
             },
-            _ => {},
-        }
-
-        let selection_range = if let Some(selection) = &text_run.selection_range {
-            let intersection = selection.intersect(&range);
-            if intersection.is_empty() {
-                let insertion_point_index = selection.start;
-                if range.contains_inclusive(insertion_point_index) {
-                    let selection_start = insertion_point_index - range.start;
-                    Some(TextByteRange::new(selection_start, selection_start))
-                } else {
-                    None
-                }
-            } else {
-                let selection_start = intersection.start - range.start;
-                Some(TextByteRange::new(
-                    selection_start,
-                    selection_start + intersection.len(),
-                ))
-            }
-        } else {
-            None
-        };
-
-        self.push_line_item_to_unbreakable_segment(LineItem::TextRun(
-            current_inline_box_identifier,
-            TextRunLineItem {
-                text: vec![glyph_store],
-                starting_glyph_offset,
-                base_fragment_info: text_run.base_fragment_info,
-                inline_styles: text_run.inline_styles.clone(),
-                font_metrics: font_metrics.clone(),
-                font_key,
-                bidi_level,
-                selection_range,
+            _ => {
+                self.push_line_item_to_unbreakable_segment(LineItem::TextRun(
+                    current_inline_box_identifier,
+                    TextRunLineItem {
+                        text: vec![glyph_store],
+                        starting_glyph_offset,
+                        base_fragment_info: text_run.base_fragment_info,
+                        inline_styles: text_run.inline_styles.clone(),
+                        font_metrics: font_metrics.clone(),
+                        font_key,
+                        bidi_level,
+                        selection_range,
+                    },
+                ));
             },
-        ));
+        }
     }
 
     fn update_unbreakable_segment_for_new_content(
