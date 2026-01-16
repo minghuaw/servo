@@ -82,7 +82,7 @@ use std::sync::Arc;
 use app_units::{Au, MAX_AU};
 use bitflags::bitflags;
 use construct::InlineFormattingContextBuilder;
-use fonts::{FontMetrics, FontRef, GlyphStore, TextByteRange};
+use fonts::{ByteIndex, FontMetrics, FontRef, GlyphRun, GlyphStore, TextByteRange};
 use inline_box::{InlineBox, InlineBoxContainerState, InlineBoxIdentifier, InlineBoxes};
 use line::{
     AbsolutelyPositionedLineItem, AtomicLineItem, FloatLineItem, LineItem, LineItemLayout,
@@ -109,6 +109,7 @@ use text_run::{
     get_font_for_first_font_for_style,
 };
 use unicode_bidi::{BidiInfo, Level};
+use webrender_api::FontInstanceKey;
 use xi_unicode::linebreak_property;
 
 use super::float::{Clear, PlacementAmongFloats};
@@ -140,6 +141,12 @@ static FONT_SUBSCRIPT_OFFSET_RATIO: f32 = 0.20;
 static FONT_SUPERSCRIPT_OFFSET_RATIO: f32 = 0.34;
 
 #[derive(Debug, MallocSizeOf)]
+pub(crate) enum IsTextInput {
+    SingleLine,
+    MultiLine,
+}
+
+#[derive(Debug, MallocSizeOf)]
 pub(crate) struct InlineFormattingContext {
     /// All [`InlineItem`]s in this [`InlineFormattingContext`] stored in a flat array.
     /// [`InlineItem::StartInlineBox`] and [`InlineItem::EndInlineBox`] allow representing
@@ -165,9 +172,9 @@ pub(crate) struct InlineFormattingContext {
     /// Whether or not this [`InlineFormattingContext`] contains floats.
     pub(super) contains_floats: bool,
 
-    /// Whether or not this is an [`InlineFormattingContext`] for a single line text input's inner
-    /// text container.
-    pub(super) is_single_line_text_input: bool,
+    /// Whether or not this is an [`InlineFormattingContext`] for the inner
+    /// text container of a single line or multi line text input
+    pub(super) is_text_input: Option<IsTextInput>,
 
     /// Whether or not this is an [`InlineFormattingContext`] has right-to-left content, which
     /// will require reordering during layout.
@@ -1596,13 +1603,18 @@ impl InlineFormattingContextLayout<'_> {
         self.update_unbreakable_segment_for_new_content(&strut_size, inline_advance, flags);
 
         let selection_range = text_run.selection_range.as_ref().and_then(|selection| {
+            log::debug!("selection: {:?}", selection);
+            log::debug!("range: {:?}", range);
             let intersection = selection.intersect(&range);
+            log::debug!("intersection: {:?}", intersection);
             if range.contains_inclusive(selection.start) {
                 Some(intersection)
             } else {
                 None
             }
         });
+
+        log::debug!("selection_range: {:?}", selection_range);
 
         let current_inline_box_identifier = self.current_inline_box_identifier();
         match self.current_line_segment.line_items.last_mut() {
@@ -1625,6 +1637,59 @@ impl InlineFormattingContextLayout<'_> {
                         base_fragment_info: text_run.base_fragment_info,
                         inline_styles: text_run.inline_styles.clone(),
                         font_metrics: font_metrics.clone(),
+                        font_key,
+                        bidi_level,
+                        selection_range,
+                    },
+                ));
+            },
+        }
+    }
+
+    fn update_selection_range_for_single_preserved_newline(
+        &mut self,
+        text_run: &TextRun,
+        range: TextByteRange,
+        bidi_level: Level,
+        font: &FontRef,
+    ) {
+        let selection_range = text_run.selection_range.as_ref().and_then(|selection| {
+            log::debug!("selection: {:?}", selection);
+            log::debug!("range: {:?}", range);
+            let intersection = selection.intersect(&range);
+            log::debug!("intersection: {:?}", intersection);
+            if range.contains_inclusive(selection.start) {
+                Some(intersection)
+            } else {
+                None
+            }
+        });
+
+        let current_inline_box_identifier = self.current_inline_box_identifier();
+        match self.current_line_segment.line_items.last_mut() {
+            Some(LineItem::TextRun(inline_box_identifier, line_item))
+                if *inline_box_identifier == current_inline_box_identifier =>
+            {
+                // line_item.text.push(glyph_store);
+                if line_item.selection_range.is_none() {
+                    line_item.selection_range = selection_range;
+                };
+                return;
+            },
+            _ => {
+                let font_metrics = font.metrics.clone();
+                let font_key = font.key(
+                    self.layout_context.painter_id,
+                    &self.layout_context.font_context,
+                );
+                self.push_line_item_to_unbreakable_segment(LineItem::TextRun(
+                    current_inline_box_identifier,
+                    TextRunLineItem {
+                        text: vec![],
+                        starting_glyph_offset: 0,
+                        base_fragment_info: text_run.base_fragment_info,
+                        inline_styles: text_run.inline_styles.clone(),
+                        font_metrics,
                         font_key,
                         bidi_level,
                         selection_range,
@@ -1819,7 +1884,7 @@ impl InlineFormattingContext {
         mut builder: InlineFormattingContextBuilder,
         layout_context: &LayoutContext,
         has_first_formatted_line: bool,
-        is_single_line_text_input: bool,
+        is_text_input: Option<IsTextInput>,
         starting_bidi_level: Level,
     ) -> Self {
         // This is to prevent a double borrow.
@@ -1869,7 +1934,7 @@ impl InlineFormattingContext {
                 .clone(),
             has_first_formatted_line,
             contains_floats: builder.contains_floats,
-            is_single_line_text_input,
+            is_text_input,
             has_right_to_left_content,
         }
     }
@@ -1924,7 +1989,7 @@ impl InlineFormattingContext {
         if inline_container_needs_strut(style, layout_context, None) {
             inline_container_state_flags.insert(InlineContainerStateFlags::CREATE_STRUT);
         }
-        if self.is_single_line_text_input {
+        if matches!(self.is_text_input, Some(IsTextInput::SingleLine)) {
             inline_container_state_flags
                 .insert(InlineContainerStateFlags::IS_SINGLE_LINE_TEXT_INPUT);
         }
@@ -1967,11 +2032,19 @@ impl InlineFormattingContext {
 
             match item {
                 InlineItem::StartInlineBox(inline_box) => {
+                    log::debug!("InlineItem::StartInlineBox");
                     layout.start_inline_box(&inline_box.borrow());
                 },
-                InlineItem::EndInlineBox => layout.finish_inline_box(),
-                InlineItem::TextRun(run) => run.borrow().layout_into_line_items(&mut layout),
+                InlineItem::EndInlineBox => {
+                    log::debug!("InlineItem::EndInlineBox");
+                    layout.finish_inline_box()
+                },
+                InlineItem::TextRun(run) => {
+                    log::debug!("InlineItem::TextRun");
+                    run.borrow().layout_into_line_items(&mut layout)
+                },
                 InlineItem::Atomic(atomic_formatting_context, offset_in_text, bidi_level) => {
+                    log::debug!("InlineItem::Atomic");
                     atomic_formatting_context.borrow().layout_into_line_items(
                         &mut layout,
                         *offset_in_text,
@@ -1979,6 +2052,7 @@ impl InlineFormattingContext {
                     );
                 },
                 InlineItem::OutOfFlowAbsolutelyPositionedBox(positioned_box, _) => {
+                    log::debug!("InlineItem::OutOfFlowAbsolutelyPositionedBox");
                     layout.push_line_item_to_unbreakable_segment(LineItem::AbsolutelyPositioned(
                         layout.current_inline_box_identifier(),
                         AbsolutelyPositionedLineItem {
@@ -1987,9 +2061,11 @@ impl InlineFormattingContext {
                     ));
                 },
                 InlineItem::OutOfFlowFloatBox(float_box) => {
+                    log::debug!("InlineItem::OutOfFlowFloatBox");
                     float_box.borrow().layout_into_line_items(&mut layout);
                 },
                 InlineItem::AnonymousBlock(block_box) => {
+                    log::debug!("InlineItem::AnonymousBlock");
                     block_box.borrow().layout_into_line_items(&mut layout);
                 },
             }

@@ -29,6 +29,7 @@ use super::line_breaker::LineBreaker;
 use super::{InlineFormattingContextLayout, SharedInlineStyles};
 use crate::context::LayoutContext;
 use crate::dom::WeakLayoutBox;
+use crate::flow::inline::IsTextInput;
 use crate::fragment_tree::BaseFragmentInfo;
 
 // These constants are the xi-unicode line breaking classes that are defined in
@@ -149,9 +150,27 @@ impl TextRunSegment {
             // If this whitespace forces a line break, queue up a hard line break the next time we
             // see any content. We don't line break immediately, because we'd like to finish processing
             // any ongoing inline boxes before ending the line.
+            //
+            // TODO: This should be handled differently if we have a textarea
             if run.is_single_preserved_newline() {
                 byte_processed = byte_processed + run.range.len();
                 ifc.defer_forced_line_break();
+
+                // TODO: if this is a textarea element
+                if matches!(ifc.ifc.is_text_input, Some(IsTextInput::MultiLine)) {
+                    ifc.possibly_flush_deferred_forced_line_break();
+                }
+
+                let range_start = byte_processed + ByteIndex(self.range.start as isize);
+                let range = TextByteRange::new(range_start, range_start + run.range.len());
+
+                ifc.update_selection_range_for_single_preserved_newline(
+                    text_run,
+                    range,
+                    self.bidi_level,
+                    &self.font
+                );
+
                 continue;
             }
             // Break before each unbreakable run in this TextRun, except the first unless the

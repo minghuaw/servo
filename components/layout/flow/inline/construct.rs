@@ -20,7 +20,7 @@ use crate::context::LayoutContext;
 use crate::dom::LayoutBox;
 use crate::dom_traversal::NodeAndStyleInfo;
 use crate::flow::float::FloatBox;
-use crate::flow::inline::AnonymousBlockBox;
+use crate::flow::inline::{AnonymousBlockBox, IsTextInput};
 use crate::flow::{BlockContainer, BlockLevelBox, PseudoElement};
 use crate::formatting_contexts::IndependentFormattingContext;
 use crate::layout_box_base::LayoutBoxBase;
@@ -358,7 +358,7 @@ impl InlineFormattingContextBuilder {
         self,
         layout_context: &LayoutContext,
         has_first_formatted_line: bool,
-        is_single_line_text_input: bool,
+        is_text_input: Option<IsTextInput>,
         default_bidi_level: Level,
     ) -> Option<InlineFormattingContext> {
         if self.is_empty {
@@ -370,7 +370,7 @@ impl InlineFormattingContextBuilder {
             self,
             layout_context,
             has_first_formatted_line,
-            is_single_line_text_input,
+            is_text_input,
             default_bidi_level,
         ))
     }

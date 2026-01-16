@@ -24,6 +24,7 @@ use crate::dom_traversal::{
     Contents, NodeAndStyleInfo, NonReplacedContents, PseudoElementContentItem, TraversalHandler,
 };
 use crate::flow::float::FloatBox;
+use crate::flow::inline::IsTextInput;
 use crate::flow::{BlockContainer, BlockFormattingContext, BlockLevelBox};
 use crate::formatting_contexts::IndependentFormattingContext;
 use crate::fragment_tree::FragmentFlags;
@@ -225,10 +226,17 @@ impl<'dom, 'style> BlockContainerBuilder<'dom, 'style> {
     }
 
     fn finish_ongoing_inline_formatting_context(&mut self) -> Option<InlineFormattingContext> {
+        let mut is_text_input = None;
+        if self.info.node.is_single_line_text_input() {
+            is_text_input = Some(IsTextInput::SingleLine);
+        } else if self.info.node.is_multi_line_text_input() {
+            is_text_input = Some(IsTextInput::MultiLine);
+        }
+
         self.inline_formatting_context_builder.take()?.finish(
             self.context,
             !self.have_already_seen_first_line_for_text_indent,
-            self.info.node.is_single_line_text_input(),
+            is_text_input,
             self.info.style.to_bidi_level(),
         )
     }

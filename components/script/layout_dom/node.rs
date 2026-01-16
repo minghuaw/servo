@@ -273,6 +273,12 @@ impl<'dom> ServoThreadSafeLayoutNode<'dom> {
                 self.node.node.is_text_container_of_single_line_input())
     }
 
+    /// Whether this is a container for the text within a single-line text inpu. This is
+    /// to disable deferred line breaking in textarea element
+    pub fn is_multi_line_text_input(&self) -> bool {
+        self.type_id() == Some(LayoutNodeType::Element(LayoutElementType::HTMLTextAreaElement))
+    }
+
     pub fn selected_style(&self) -> Arc<ComputedValues> {
         let Some(element) = self.as_element() else {
             // TODO(stshine): What should the selected style be for text?
