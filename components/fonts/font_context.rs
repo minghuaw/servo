@@ -812,7 +812,7 @@ impl FontContext {
                 if let Source::Url(url) = source {
                     url.url
                         .url()
-                        .clone()
+                        .cloned()
                         .map(ServoUrl::from)
                         .map(FontIdentifier::Web)
                         .is_some_and(|url| !self.font_data.read().contains_key(&url))
