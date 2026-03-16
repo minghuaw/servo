@@ -808,6 +808,18 @@ impl FontContext {
             .iter()
             .rev()
             .filter(Self::is_supported_web_font_source)
+            .filter(|source| {
+                if let Source::Url(url) = source {
+                    url.url
+                        .url()
+                        .clone()
+                        .map(ServoUrl::from)
+                        .map(FontIdentifier::Web)
+                        .is_some_and(|url| !self.font_data.read().contains_key(&url))
+                } else {
+                    true
+                }
+            })
             .cloned()
             .collect();
 
