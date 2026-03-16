@@ -3310,7 +3310,9 @@ impl ScriptThread {
         };
 
         // TODO: This should only dirty nodes that are waiting for a web font to finish loading!
-        document.dirty_all_nodes();
+        if _success {
+            document.dirty_all_nodes();
+        }
     }
 
     /// Handles a worklet being loaded by triggering a relayout of the page. Does nothing if the
