@@ -576,7 +576,7 @@ impl<'dom> NodeExt<'dom> for ServoThreadSafeLayoutNode<'dom> {
                 match &mut *block_level {
                     BlockLevelBox::Independent(independent_formatting_context) => {
                         independent_formatting_context.rebuild(layout_context, &info);
-                        true
+                        false
                     },
                     BlockLevelBox::OutOfFlowAbsolutelyPositionedBox(positioned_box) => {
                         positioned_box
