@@ -276,8 +276,10 @@ webdriver = { version = "0.53.0", default-features = false }
 webpki-roots = "1.0"
 webrender = { version = "0.68", features = ["capture"] }
 webrender_api = "0.68"
-wgpu-core = "29"
-wgpu-types = "29"
+# wgpu-core = "29"
+# wgpu-types = "29"
+wgpu-core = { git = "https://github.com/minghuaw/wgpu.git", branch = "ash-ohos" }
+wgpu-types = { git = "https://github.com/minghuaw/wgpu.git", branch = "ash-ohos" }
 winapi = "0.3"
 windows-sys = "0.61"
 winit = "0.30.13"
