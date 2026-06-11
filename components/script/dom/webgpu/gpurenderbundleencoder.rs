@@ -117,7 +117,7 @@ impl GPURenderBundleEncoder {
         };
 
         // Handle error gracefully
-        let render_bundle_encoder = RenderBundleEncoder::new(&desc, device.id().0).unwrap();
+        let render_bundle_encoder = RenderBundleEncoder::new(&desc, None, device.id().0).unwrap();
 
         Ok(GPURenderBundleEncoder::new(
             cx,
@@ -192,7 +192,7 @@ impl GPURenderBundleEncoderMethods<crate::DomTypeHolder> for GPURenderBundleEnco
             wgpu_bundle::wgpu_render_bundle_set_vertex_buffer(
                 encoder,
                 slot,
-                buffer.id().0,
+                Some(buffer.id().0),
                 offset,
                 wgpu_types::BufferSize::new(size),
             );

@@ -429,7 +429,7 @@ impl Preferences {
             dom_transient_activation_duration_ms: 5000,
             dom_web_animations_enabled: false,
             dom_webgl2_enabled: false,
-            dom_webgpu_enabled: false,
+            dom_webgpu_enabled: true,
             dom_webgpu_wgpu_backend: String::new(),
             dom_webrtc_enabled: false,
             dom_webrtc_transceiver_enabled: false,

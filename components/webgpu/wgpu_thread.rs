@@ -579,7 +579,7 @@ impl WGPU {
                     } => {
                         let global = &self.global;
                         let (_, error) = global.render_bundle_encoder_finish(
-                            render_bundle_encoder,
+                            Box::new(render_bundle_encoder),
                             &descriptor,
                             Some(render_bundle_id),
                         );

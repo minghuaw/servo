@@ -96,6 +96,7 @@ impl GPUMethods<crate::DomTypeHolder> for GPU {
                     power_preference,
                     compatible_surface: None,
                     force_fallback_adapter: options.forceFallbackAdapter,
+                    apply_limit_buckets: false,
                 },
                 ids,
             ))
