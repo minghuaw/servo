@@ -1146,6 +1146,10 @@ impl Fragment {
             if text_decoration.line.contains(TextDecorationLine::UNDERLINE) {
                 let mut rect = rect;
                 rect.origin.y += font_metrics.ascent - font_metrics.underline_offset;
+                rect.origin.y += text_decoration
+                    .underline_offset
+                    .to_used_value(font_size.computed_size.0.into())
+                    .unwrap_or(Au::zero());
                 rect.size.height = resolve_thickness(&text_decoration.thickness);
                 Self::build_display_list_for_text_decoration(
                     state,
