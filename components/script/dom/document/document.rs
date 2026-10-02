@@ -371,6 +371,8 @@ bitflags! {
         /// one more rendering update possibility after this happens, so that any potential screenshot
         /// reflects the up-to-date contents.
         const FontReadyPromiseFulfilled = 1 << 2;
+        /// An ongoing smooth scroll needs per-frame advancement.
+        const SmoothScroll = 1 << 3;
     }
 }
 
@@ -4247,6 +4249,12 @@ impl Document {
     pub(crate) fn add_rendering_update_reason(&self, reason: RenderingUpdateReason) {
         self.rendering_update_reasons
             .set(self.rendering_update_reasons.get().union(reason));
+    }
+
+    /// Remove a single [`RenderingUpdateReason`] from this [`Document`].
+    pub(crate) fn remove_rendering_update_reason(&self, reason: RenderingUpdateReason) {
+        self.rendering_update_reasons
+            .set(self.rendering_update_reasons.get().difference(reason));
     }
 
     /// Clear all [`RenderingUpdateReason`]s from this [`Document`].
