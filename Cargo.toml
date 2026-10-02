@@ -220,14 +220,14 @@ rustls-pki-types = "1.14"
 rustls-platform-verifier = "0.7.0"
 sea-query = { version = "1.0.1", default-features = false, features = ["backend-sqlite", "derive"] }
 sea-query-rusqlite = "0.8.0"
-selectors = { git = "https://github.com/minghuaw/stylo", rev = "8c1db0f90d89a98679ddb4d7a477550208094221" }
+selectors = { git = "https://github.com/minghuaw/stylo", rev = "bb7979dac835ca3606e32d44830f3717ac165bec" }
 serde = "1.0.228"
 serde_bytes = "0.11"
 serde_core = "1.0.226"
 serde_json = "1.0"
 serde_test = "1.0"
 serde_with = "3.13"
-servo_arc = { git = "https://github.com/minghuaw/stylo", rev = "8c1db0f90d89a98679ddb4d7a477550208094221" }
+servo_arc = { git = "https://github.com/minghuaw/stylo", rev = "bb7979dac835ca3606e32d44830f3717ac165bec" }
 sha1 = "0.11"
 sha2 = "0.11"
 sha3 = "0.12"
@@ -238,12 +238,12 @@ speexdsp-resampler = "0.1.0"
 sponge-cursor = "0.1"
 string_cache = "0.11"
 strum = { version = "0.28", features = ["derive"] }
-stylo = { git = "https://github.com/minghuaw/stylo", rev = "8c1db0f90d89a98679ddb4d7a477550208094221" }
-stylo_atoms = { git = "https://github.com/minghuaw/stylo", rev = "8c1db0f90d89a98679ddb4d7a477550208094221" }
-stylo_dom = { git = "https://github.com/minghuaw/stylo", rev = "8c1db0f90d89a98679ddb4d7a477550208094221" }
-stylo_malloc_size_of = { git = "https://github.com/minghuaw/stylo", rev = "8c1db0f90d89a98679ddb4d7a477550208094221" }
-stylo_static_prefs = { git = "https://github.com/minghuaw/stylo", rev = "8c1db0f90d89a98679ddb4d7a477550208094221" }
-stylo_traits = { git = "https://github.com/minghuaw/stylo", rev = "8c1db0f90d89a98679ddb4d7a477550208094221" }
+stylo = { git = "https://github.com/minghuaw/stylo", rev = "bb7979dac835ca3606e32d44830f3717ac165bec" }
+stylo_atoms = { git = "https://github.com/minghuaw/stylo", rev = "bb7979dac835ca3606e32d44830f3717ac165bec" }
+stylo_dom = { git = "https://github.com/minghuaw/stylo", rev = "bb7979dac835ca3606e32d44830f3717ac165bec" }
+stylo_malloc_size_of = { git = "https://github.com/minghuaw/stylo", rev = "bb7979dac835ca3606e32d44830f3717ac165bec" }
+stylo_static_prefs = { git = "https://github.com/minghuaw/stylo", rev = "bb7979dac835ca3606e32d44830f3717ac165bec" }
+stylo_traits = { git = "https://github.com/minghuaw/stylo", rev = "bb7979dac835ca3606e32d44830f3717ac165bec" }
 surfman = "0.14.0"
 swapper = "0.1"
 syn = { version = "2", default-features = false, features = ["clone-impls", "derive", "parsing"] }
@@ -473,15 +473,15 @@ codegen-units = 1
 #
 # Or for Stylo:
 #
-[patch."https://github.com/minghuaw/stylo"]
-selectors = { path = "../stylo/selectors" }
-servo_arc = { path = "../stylo/servo_arc" }
-stylo = { path = "../stylo/style" }
-stylo_atoms = { path = "../stylo/stylo_atoms" }
-stylo_dom = { path = "../stylo/stylo_dom" }
-stylo_malloc_size_of = { path = "../stylo/malloc_size_of" }
-stylo_static_prefs = { path = "../stylo/stylo_static_prefs" }
-stylo_traits = { path = "../stylo/style_traits" }
+# [patch."https://github.com/minghuaw/stylo"]
+# selectors = { path = "../stylo/selectors" }
+# servo_arc = { path = "../stylo/servo_arc" }
+# stylo = { path = "../stylo/style" }
+# stylo_atoms = { path = "../stylo/stylo_atoms" }
+# stylo_dom = { path = "../stylo/stylo_dom" }
+# stylo_malloc_size_of = { path = "../stylo/malloc_size_of" }
+# stylo_static_prefs = { path = "../stylo/stylo_static_prefs" }
+# stylo_traits = { path = "../stylo/style_traits" }
 #
 # Or for another Git dependency:
 #
