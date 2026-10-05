@@ -371,6 +371,8 @@ bitflags! {
         /// one more rendering update possibility after this happens, so that any potential screenshot
         /// reflects the up-to-date contents.
         const FontReadyPromiseFulfilled = 1 << 2;
+        /// An ongoing smooth scroll needs per-frame advancement.
+        const SmoothScroll = 1 << 3;
     }
 }
 
@@ -1712,10 +1714,30 @@ impl Document {
             // let doc be the VisualViewport’s associated document and target be the
             // VisualViewport. Otherwise, box belongs to an element and let doc be the
             // element’s node document and target be the element.
-            let Some(element) = target.downcast::<Element>() else {
+            let document = if let Some(element) = target.downcast::<Element>() {
+                let document = element.owner_document();
+
+                // Smooth scrolling is asynchronous: if the scrolling box is still animating,
+                // defer the `scrollend` event until the animation has actually finished.
+                // Otherwise we would fire a `scrollend` on every frame of the smooth scroll.
+                if document
+                    .window()
+                    .has_pending_smooth_scroll_for_element(element)
+                {
+                    continue;
+                }
+                document
+            } else if let Some(document) = target.downcast::<Document>() {
+                // A viewport scroll. Defer `scrollend` while the viewport is still animating.
+                let window = document.window();
+                if window.has_pending_smooth_scroll(window.pipeline_id().root_scroll_id()) {
+                    continue;
+                }
+                DomRoot::from_ref(document)
+            } else {
+                // TODO: Handle VisualViewport scroll targets.
                 continue;
             };
-            let document = element.owner_document();
 
             // Step 1.2: If box belongs to a snap container, snapcontainer, run the
             // update scrollsnapchange targets steps for snapcontainer.
@@ -1810,6 +1832,37 @@ impl Document {
                 target: Dom::from_ref(event_target),
                 event: "scroll".into(),
             });
+    }
+
+    /// Queues a `scrollend` event for `target`, if one is not already pending. This is used when
+    /// an asynchronous (smooth) scroll finishes, since the final frame might not move the scroll
+    /// offset (e.g. when the requested offset is clamped) and so might not emit a `scroll` event.
+    fn queue_scrollend(&self, target: &EventTarget) {
+        let event = "scrollend".into();
+        if self
+            .pending_scroll_events
+            .borrow()
+            .iter()
+            .any(|existing| existing.equivalent(target, &event))
+        {
+            return;
+        }
+        self.pending_scroll_events
+            .borrow_mut()
+            .push(PendingScrollEvent {
+                target: Dom::from_ref(target),
+                event: "scrollend".into(),
+            });
+    }
+
+    /// Queues a `scrollend` event for an element's scrolling box.
+    pub(crate) fn queue_scrollend_for_element(&self, element: &Element) {
+        self.queue_scrollend(element.upcast::<EventTarget>());
+    }
+
+    /// Queues a `scrollend` event for this document's viewport.
+    pub(crate) fn queue_scrollend_for_viewport(&self) {
+        self.queue_scrollend(self.upcast::<EventTarget>());
     }
 
     /// <https://dom.spec.whatwg.org/#converting-nodes-into-a-node>
@@ -4247,6 +4300,12 @@ impl Document {
     pub(crate) fn add_rendering_update_reason(&self, reason: RenderingUpdateReason) {
         self.rendering_update_reasons
             .set(self.rendering_update_reasons.get().union(reason));
+    }
+
+    /// Remove a single [`RenderingUpdateReason`] from this [`Document`].
+    pub(crate) fn remove_rendering_update_reason(&self, reason: RenderingUpdateReason) {
+        self.rendering_update_reasons
+            .set(self.rendering_update_reasons.get().difference(reason));
     }
 
     /// Clear all [`RenderingUpdateReason`]s from this [`Document`].
