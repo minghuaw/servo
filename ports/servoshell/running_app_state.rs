@@ -547,27 +547,19 @@ impl RunningAppState {
         }
 
         // WR_CAPTURE_TOOLING: if SERVO_WEBRENDER_CAPTURE_DIR is set, capture a WebRender
-        // frame sequence into <dir>/sequence. Started here (load complete) and stopped
-        // when the stable-image screenshot is taken, so animations during this window
-        // (e.g. smooth scrolling) are captured. See the `tooling/webrender-capture` branch.
-        let capture_dir = std::env::var_os("SERVO_WEBRENDER_CAPTURE_DIR")
-            .map(std::path::PathBuf::from)
-            .map(|dir| {
-                let _ = std::fs::create_dir_all(&dir);
-                dir
-            });
-        let webview_for_capture = webview.clone();
-        if let Some(dir) = &capture_dir {
+        // frame sequence into <dir>/sequence. Started here (load complete); webrender writes
+        // each frame's capture during the run, so animations in this window (e.g. smooth
+        // scrolling) are captured. The sequence is not stopped explicitly: calling
+        // `stop_capture_sequence` from the screenshot callback re-enters the WebView borrow
+        // and panics ("RefCell already mutably borrowed"), and process exit ends the sequence.
+        // See the `tooling/webrender-capture` branch.
+        if let Some(dir) = std::env::var_os("SERVO_WEBRENDER_CAPTURE_DIR").map(std::path::PathBuf::from) {
+            let _ = std::fs::create_dir_all(&dir);
             webview.start_capture_sequence(dir.join("sequence"));
         }
 
         webview.take_screenshot(None, move |image| {
             achieved_stable_image.set(true);
-
-            // WR_CAPTURE_TOOLING
-            if capture_dir.is_some() {
-                webview_for_capture.stop_capture_sequence();
-            }
 
             let Some(output_path) = output_path else {
                 return;
