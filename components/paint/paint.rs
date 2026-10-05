@@ -843,6 +843,23 @@ impl Paint {
             .save_capture(capture_path, CaptureBits::all());
     }
 
+    // WR_CAPTURE_TOOLING: start a WebRender capture sequence (one capture per rendered
+    // frame). `path` must already exist. Stop it with `stop_capture_sequence`.
+    pub fn start_capture_sequence(&self, webview_id: WebViewId, path: std::path::PathBuf) {
+        log::info!("Starting WebRender capture sequence at {path:?}");
+        self.painter(webview_id.into())
+            .webrender_api
+            .start_capture_sequence(path, CaptureBits::all());
+    }
+
+    // WR_CAPTURE_TOOLING: stop the WebRender capture sequence started above.
+    pub fn stop_capture_sequence(&self, webview_id: WebViewId) {
+        log::info!("Stopping WebRender capture sequence");
+        self.painter(webview_id.into())
+            .webrender_api
+            .stop_capture_sequence();
+    }
+
     /// Returning `false` means this is not going to reach the Constellation,
     /// and we need to directly notify the embedder that input event is handled.
     pub fn notify_input_event(&self, webview_id: WebViewId, event: InputEventAndId) -> bool {

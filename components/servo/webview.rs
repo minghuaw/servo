@@ -716,6 +716,16 @@ impl WebView {
         self.servo().paint().capture_webrender(self.id());
     }
 
+    // WR_CAPTURE_TOOLING: start capturing a sequence of WebRender frames to `path`.
+    pub fn start_capture_sequence(&self, path: std::path::PathBuf) {
+        self.servo().paint().start_capture_sequence(self.id(), path);
+    }
+
+    // WR_CAPTURE_TOOLING: stop the WebRender capture sequence.
+    pub fn stop_capture_sequence(&self) {
+        self.servo().paint().stop_capture_sequence(self.id());
+    }
+
     /// Paint the contents of this [`WebView`] into its [`RenderingContext`].
     pub fn paint(&self) {
         self.servo().paint().render(self.id());
