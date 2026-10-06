@@ -180,6 +180,36 @@ impl From<ServoLayoutNode<'_>> for BaseFragmentInfo {
                 {
                     flags.insert(FragmentFlags::IS_BR_ELEMENT);
                 },
+                PseudoElement::Before
+                    if node.as_html_element().is_some_and(|element| {
+                        element.local_name() == &local_name!("input") &&
+                            element
+                                .attribute(&ns!(), &local_name!("type"))
+                                .is_some_and(|attr| {
+                                    matches!(attr.as_atom().to_ascii_lowercase(), atom!("checkbox"))
+                                }) &&
+                            element
+                                .attribute(&ns!(), &local_name!("disabled"))
+                                .is_none()
+                    }) =>
+                {
+                    flags.insert(FragmentFlags::IS_CHECKBOX_BEFORE);
+                },
+                PseudoElement::After
+                    if node.as_html_element().is_some_and(|element| {
+                        element.local_name() == &local_name!("input") &&
+                            element
+                                .attribute(&ns!(), &local_name!("type"))
+                                .is_some_and(|attr| {
+                                    matches!(attr.as_atom().to_ascii_lowercase(), atom!("radio"))
+                                }) &&
+                            element
+                                .attribute(&ns!(), &local_name!("disabled"))
+                                .is_none()
+                    }) =>
+                {
+                    flags.insert(FragmentFlags::IS_RADIO_AFTER);
+                },
                 _ => {},
             }
             return Self {
@@ -276,6 +306,12 @@ bitflags! {
         const IS_INPUT_ELEMENT = 1 << 12;
         /// Whether this is a <button> element, or an <input> that uses button layout.
         const IS_BUTTON = 1 << 13;
+        /// Whether this is the `::before` pseudo-element of an enabled checked-capable
+        /// `<input type=checkbox>`, whose glyph color is driven by `accent-color`.
+        const IS_CHECKBOX_BEFORE = 1 << 14;
+        /// Whether this is the `::after` pseudo-element of an enabled
+        /// `<input type=radio>`, whose bullet color is driven by `accent-color`.
+        const IS_RADIO_AFTER = 1 << 15;
     }
 }
 
