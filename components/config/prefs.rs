@@ -109,6 +109,8 @@ pub struct Preferences {
     pub fonts_monospace: String,
     pub fonts_default_size: i64,
     pub fonts_default_monospace_size: i64,
+    /// Whether to render in forced colors mode (for testing forced-colors / forced-color-adjust).
+    pub forced_colors_enabled: bool,
     /// The amount of time that a half cycle of a text caret blink takes in milliseconds.
     /// If this value is less than or equal to zero, then caret blink is disabled.
     pub editing_caret_blink_time: i64,
@@ -513,6 +515,7 @@ impl Preferences {
             fonts_monospace: String::new(),
             fonts_sans_serif: String::new(),
             fonts_serif: String::new(),
+            forced_colors_enabled: false,
             gfx_precache_shaders: false,
             gfx_text_antialiasing_enabled: true,
             gfx_subpixel_text_antialiasing_enabled: true,
