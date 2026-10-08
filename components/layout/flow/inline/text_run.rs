@@ -197,6 +197,11 @@ pub(crate) struct TextRunSegment {
     #[conditional_malloc_size_of]
     pub runs: Vec<Arc<ShapedTextSlice>>,
 
+    /// For each entry in [`Self::runs`], the hyphen glyph to render if a line break is
+    /// taken immediately after that run (i.e. at a hyphenation opportunity).
+    #[conditional_malloc_size_of]
+    pub hyphen_after: Vec<Option<Arc<ShapedTextSlice>>>,
+
     /// The shaped text that was used to produce this segment. [`Self::runs`] are slices
     /// of this shaped text.
     #[conditional_malloc_size_of]
@@ -214,6 +219,7 @@ impl TextRunSegment {
             byte_range,
             character_range,
             runs: Vec::new(),
+            hyphen_after: Vec::new(),
             break_at_start: false,
             shaped_text: None,
         }
@@ -282,11 +288,13 @@ impl TextRunSegment {
             }
 
             let run_start = text_run.run_data.character_range_in_ifc_text.start;
+            let hyphen_after = self.hyphen_after.get(run_index).cloned().flatten();
             ifc.push_glyph_store_to_unbreakable_segment(
                 run.clone(),
                 text_run,
                 &self.info,
                 character_range_start - run_start..new_character_range_end - run_start,
+                hyphen_after,
             );
 
             character_range_start = new_character_range_end;

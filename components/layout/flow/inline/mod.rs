@@ -70,6 +70,7 @@
 
 pub mod construct;
 mod full_width;
+mod hyphenation;
 pub mod inline_box;
 pub mod line;
 mod line_breaker;
@@ -1638,6 +1639,7 @@ impl InlineFormattingContextLayout<'_> {
         text_run: &TextRun,
         info: &FontAndScriptInfo,
         character_range: Range<Utf32CodeUnits>,
+        hyphen_after: Option<Arc<ShapedTextSlice>>,
     ) {
         let inline_advance = glyph_store.total_advance();
         let flags = if glyph_store.is_whitespace() {
@@ -1688,6 +1690,7 @@ impl InlineFormattingContextLayout<'_> {
             current_inline_box_identifier,
             TextRunLineItem {
                 text: vec![glyph_store],
+                hyphen_after,
                 text_fragment_run_data: text_run.run_data.clone(),
                 base_fragment_info: text_run.base_fragment_info,
                 info: info.clone(),
@@ -1725,6 +1728,7 @@ impl InlineFormattingContextLayout<'_> {
             self.current_inline_box_identifier(),
             TextRunLineItem {
                 text: Default::default(),
+                hyphen_after: None,
                 text_fragment_run_data: caret_placeholder.run_data,
                 base_fragment_info: caret_placeholder.base_fragment_info,
                 info: FontAndScriptInfo::simple_for_font(font),
@@ -1807,7 +1811,42 @@ impl InlineFormattingContextLayout<'_> {
         if self.text_wrap_mode == TextWrapMode::Nowrap {
             return;
         }
-        if !self.unbreakable_segment_fits_on_line() {
+
+        // If the last in-flow content on the line ended at a hyphenation opportunity, a hyphen
+        // is added to the end of the line when a break is taken here. Account for its advance
+        // when deciding whether the line fits; if no break is taken the hyphen is discarded.
+        let hyphen_advance = self
+            .current_line
+            .line_items
+            .iter()
+            .rev()
+            .find(|item| item.is_in_flow_content())
+            .and_then(|item| match item {
+                LineItem::TextRun(_, item) => item
+                    .hyphen_after
+                    .as_ref()
+                    .map(|hyphen| hyphen.total_advance()),
+                _ => None,
+            })
+            .unwrap_or_else(Au::zero);
+        self.current_line.inline_position += hyphen_advance;
+
+        if self.unbreakable_segment_fits_on_line() {
+            self.current_line.inline_position -= hyphen_advance;
+        } else {
+            if hyphen_advance != Au::zero() {
+                if let Some(LineItem::TextRun(_, item)) = self
+                    .current_line
+                    .line_items
+                    .iter_mut()
+                    .rev()
+                    .find(|item| item.is_in_flow_content())
+                {
+                    if let Some(hyphen) = item.hyphen_after.take() {
+                        item.text.push(hyphen);
+                    }
+                }
+            }
             self.process_line_break(
                 false, /* forced_line_break */
                 false, /* for_block_level */
@@ -1941,13 +1980,14 @@ impl InlineFormattingContext {
             .last()
             .expect("Should have at least one SharedInlineStyle for the root of an IFC")
             .clone();
-        let (word_break, line_break, lang) = {
+        let (word_break, line_break, lang, hyphens) = {
             let styles = shared_inline_styles.style.borrow();
             let text_style = styles.get_inherited_text();
             (
                 text_style.word_break,
                 text_style.line_break,
                 styles.get_font()._x_lang.clone(),
+                text_style.hyphens,
             )
         };
 
@@ -1972,7 +2012,8 @@ impl InlineFormattingContext {
         let content_locale = lang.0.parse::<LanguageIdentifier>().ok();
         options.content_locale = content_locale.as_ref();
 
-        let mut shaping_queue = ShapingQueue::new(&text_content, options);
+        let mut shaping_queue =
+            ShapingQueue::new(&text_content, options, hyphens, content_locale.as_ref());
         for item in &mut builder.inline_items {
             match item {
                 InlineItem::TextRun(text_run) => {
