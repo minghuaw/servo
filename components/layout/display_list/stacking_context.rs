@@ -25,8 +25,10 @@ use style::computed_values::position::T as ComputedPosition;
 use style::computed_values::text_decoration_style::T as TextDecorationStyle;
 use style::computed_values::text_decoration_thickness::T as TextDecorationThickness;
 use style::values::computed::angle::Angle;
-use style::values::computed::{ClipRectOrAuto, Length, TextDecorationLine};
-use style::values::computed::LengthPercentageOrAuto as ComputedLengthPercentageOrAuto;
+use style::values::computed::{
+    ClipRectOrAuto, Length, LengthPercentageOrAuto as ComputedLengthPercentageOrAuto,
+    TextDecorationLine,
+};
 use style::values::generics::box_::{OverflowClipMarginBox, Perspective};
 use style::values::generics::transform::{
     self, GenericRotate, GenericScale, GenericTranslate, get_normalized_vector_and_angle,
