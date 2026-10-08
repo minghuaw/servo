@@ -75,6 +75,7 @@ use style::traversal::DomTraversal;
 use style::traversal_flags::TraversalFlags;
 use style::values::computed::font::GenericFontFamily;
 use style::values::computed::{CSSPixelLength, FontSize, Length, NonNegativeLength};
+use style::values::specified::color::ForcedColors;
 use style::values::specified::font::{KeywordInfo, QueryFontMetricsFlags};
 use style::{Zero, driver};
 use style_traits::{CSSPixel, SpeculativePainter};
@@ -822,6 +823,11 @@ impl LayoutThread {
             Box::new(LayoutFontMetricsProvider(config.font_context.clone())),
             ComputedValues::initial_values_with_font_override(font),
             config.theme.into(),
+            if pref!(forced_colors_enabled) {
+                ForcedColors::Active
+            } else {
+                ForcedColors::None
+            },
             PointerCapabilities::default(),
             PointerCapabilities::default(),
         );
