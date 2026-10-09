@@ -6,8 +6,10 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use fonts::{ShapedText, ShapedTextSlice, ShapedTextSliceType, ShapedTextSlicer, ShapingOptions};
+use icu_locale_core::LanguageIdentifier;
 use icu_segmenter::options::LineBreakOptions;
 use servo_base::text::{AssumeUnder4GB, Utf8CodeUnits, Utf32CodeUnits};
+use style::computed_values::hyphens::T as Hyphens;
 use style::computed_values::white_space_collapse::T as WhiteSpaceCollapse;
 use style::computed_values::word_break::T as WordBreak;
 use style::properties::ComputedValues;
@@ -84,7 +86,11 @@ impl BatchSlicer<'_> {
         &mut self,
         segment: &ShapingQueueText,
         parent_style: &ComputedValues,
-    ) -> (Vec<Arc<ShapedTextSlice>>, bool) {
+    ) -> (
+        Vec<Arc<ShapedTextSlice>>,
+        Vec<Option<Arc<ShapedTextSlice>>>,
+        bool,
+    ) {
         // Gather the linebreaks that apply to this segment from the inline formatting context's collection
         // of line breaks. Also add a simulated break at the end of the segment in order to ensure the final
         // piece of text is processed.
@@ -92,7 +98,19 @@ impl BatchSlicer<'_> {
         let linebreaks = self
             .line_breaker
             .advance_to_linebreaks_in_range(segment.byte_range.clone());
-        let linebreak_iter = linebreaks.iter().chain(std::iter::once(&range.end));
+        let mut break_opportunities: Vec<(Utf8CodeUnits, bool)> = linebreaks
+            .iter()
+            .map(|opportunity| (opportunity.offset, opportunity.hyphenate))
+            .collect();
+        // Add a simulated break at the end of the segment so the final piece of text is
+        // processed. If that boundary is also a hyphenation opportunity (it is handled as a
+        // break at the start of the *next* segment), mark it here so that the hyphen is
+        // attached to this segment's final run.
+        let end_hyphenate = self.line_breaker.is_hyphenation_break_at(range.end);
+        match break_opportunities.last_mut() {
+            Some(last) if last.0 == range.end => last.1 |= end_hyphenate,
+            _ => break_opportunities.push((range.end, end_hyphenate)),
+        }
 
         let mut break_at_start = false;
 
@@ -105,21 +123,20 @@ impl BatchSlicer<'_> {
         let mut current_character_offset =
             segment.character_range.start - self.character_offset_origin;
 
-        let mut runs = Vec::with_capacity(linebreaks.len());
-        let mut maybe_push_run = |run: Option<Arc<ShapedTextSlice>>| {
-            if let Some(run) = run {
-                runs.push(run);
-            }
-        };
+        let mut runs = Vec::with_capacity(break_opportunities.len());
+        // For each run, the hyphen to render if a line break occurs immediately after it.
+        let mut hyphen_after = Vec::with_capacity(break_opportunities.len());
+        // Lazily-shaped hyphen glyph shared by all hyphenation breaks within this segment.
+        let mut hyphen_slice: Option<Arc<ShapedTextSlice>> = None;
 
-        for break_index in linebreak_iter {
-            if *break_index == segment.byte_range.start {
+        for (break_index, hyphenate) in break_opportunities {
+            if break_index == segment.byte_range.start {
                 break_at_start = true;
                 continue;
             }
 
             // Extend the slice to the next UAX#14 line break opportunity.
-            let mut slice = last_slice.end..*break_index;
+            let mut slice = last_slice.end..break_index;
             let word = &self.text[Utf8CodeUnits::to_usize_range(&slice)];
 
             // Split off any trailing whitespace into a separate glyph run.
@@ -153,7 +170,7 @@ impl BatchSlicer<'_> {
             // If there's no whitespace and `word-break` is set to `keep-all`, try increasing the slice.
             // TODO: This should only happen for CJK text.
             if !ends_with_whitespace &&
-                *break_index != segment.byte_range.end &&
+                break_index != segment.byte_range.end &&
                 text_style.word_break == WordBreak::KeepAll &&
                 !can_break_anywhere
             {
@@ -161,7 +178,7 @@ impl BatchSlicer<'_> {
             }
 
             // Only advance the last slice if we are not going to try to expand the slice.
-            last_slice = slice.start..*break_index;
+            last_slice = slice.start..break_index;
 
             // Push the non-whitespace part of the range.
             if !slice.is_empty() {
@@ -170,10 +187,30 @@ impl BatchSlicer<'_> {
                     AssumeUnder4GB,
                     &self.text[Utf8CodeUnits::to_usize_range(&slice)],
                 );
-                maybe_push_run(
-                    self.slicer
-                        .slice_until_character_offset(current_character_offset, slice_type),
-                );
+                if let Some(run) = self
+                    .slicer
+                    .slice_until_character_offset(current_character_offset, slice_type)
+                {
+                    // If this run ends at a hyphenation opportunity, remember the hyphen to
+                    // render if a line break is eventually taken here.
+                    let hyphen = if hyphenate {
+                        if hyphen_slice.is_none() {
+                            let options = ShapingOptions::from(&segment.info);
+                            let shaped_text =
+                                segment.info.font_info.font.shape_text("\u{2010}", &options);
+                            hyphen_slice = ShapedTextSlicer::new(shaped_text)
+                                .slice_until_character_offset(
+                                    Utf32CodeUnits(1),
+                                    ShapedTextSliceType::Word,
+                                );
+                        }
+                        hyphen_slice.clone()
+                    } else {
+                        None
+                    };
+                    runs.push(run);
+                    hyphen_after.push(hyphen);
+                }
             }
 
             let whitespace = Utf8CodeUnits::to_usize_range(&whitespace);
@@ -186,10 +223,13 @@ impl BatchSlicer<'_> {
             if text_style.white_space_collapse == WhiteSpaceCollapse::BreakSpaces {
                 for _ in self.text[whitespace].chars() {
                     current_character_offset += Utf32CodeUnits(1);
-                    maybe_push_run(self.slicer.slice_until_character_offset(
+                    if let Some(run) = self.slicer.slice_until_character_offset(
                         current_character_offset,
                         ShapedTextSliceType::WhiteSpace,
-                    ));
+                    ) {
+                        runs.push(run);
+                        hyphen_after.push(None);
+                    }
                 }
                 continue;
             }
@@ -197,13 +237,16 @@ impl BatchSlicer<'_> {
             // TODO: ensure layout doesn’t handle more than 4 GiB at a time?
             current_character_offset +=
                 Utf32CodeUnits::length_of(AssumeUnder4GB, &self.text[whitespace]);
-            maybe_push_run(self.slicer.slice_until_character_offset(
+            if let Some(run) = self.slicer.slice_until_character_offset(
                 current_character_offset,
                 ShapedTextSliceType::WhiteSpace,
-            ));
+            ) {
+                runs.push(run);
+                hyphen_after.push(None);
+            }
         }
 
-        (runs, break_at_start)
+        (runs, hyphen_after, break_at_start)
     }
 }
 
@@ -240,11 +283,16 @@ pub(crate) struct ShapingQueue<'a> {
 }
 
 impl<'a> ShapingQueue<'a> {
-    pub(crate) fn new(text: &'a str, line_break_options: LineBreakOptions<'_>) -> Self {
+    pub(crate) fn new(
+        text: &'a str,
+        line_break_options: LineBreakOptions<'_>,
+        hyphens: Hyphens,
+        language: Option<&LanguageIdentifier>,
+    ) -> Self {
         Self {
             queue: Default::default(),
             text,
-            line_breaker: LineBreaker::new(text, line_break_options),
+            line_breaker: LineBreaker::new(text, line_break_options, hyphens, language),
             byte_range: Default::default(),
             character_range: Default::default(),
             resolved_script: None,
@@ -309,7 +357,7 @@ impl<'a> ShapingQueue<'a> {
         for entry in self.queue.drain(..) {
             let mut text_run = entry.text_run.borrow_mut();
             let style = text_run.inline_styles().style.borrow().clone();
-            let (runs, break_at_start) =
+            let (runs, hyphen_after, break_at_start) =
                 slicer.slice_shaped_text_at_line_break_opportunities(&entry, &style);
 
             if let TextRunItem::TextSegment(text_segment) =
@@ -317,6 +365,7 @@ impl<'a> ShapingQueue<'a> {
             {
                 text_segment.shaped_text = Some(shaped_text.clone());
                 text_segment.runs = runs;
+                text_segment.hyphen_after = hyphen_after;
                 text_segment.break_at_start = break_at_start;
             }
         }

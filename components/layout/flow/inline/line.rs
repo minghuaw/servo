@@ -964,6 +964,9 @@ pub(super) struct TextRunLineItem {
     pub info: FontAndScriptInfo,
     pub base_fragment_info: BaseFragmentInfo,
     pub text: Vec<Arc<ShapedTextSlice>>,
+    /// If a line break is taken immediately after this text run, the hyphen glyph to render
+    /// at the end of the line. This is used for `hyphens: manual` and `hyphens: auto`.
+    pub hyphen_after: Option<Arc<ShapedTextSlice>>,
     /// The range of characters this [`TextRunLineItem`] represents within the text of its
     /// original DOM node (modified by text transformation).
     pub character_range_in_dom_node: Range<Utf32CodeUnits>,

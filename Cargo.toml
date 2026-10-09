@@ -148,6 +148,7 @@ kurbo = { version = "0.13.1", features = ["euclid"] }
 libc = "0.2"
 log = "0.4.32"
 mach2 = "0.7"
+mapped_hyph = { git = "https://github.com/jfkthame/mapped_hyph", rev = "eff105f6ad7ec9b79816cfc1985a28e5340ad14b" }
 malloc_size_of_derive = "0.1"
 markup5ever = "0.40"
 memmap2 = "0.9.10"
@@ -220,14 +221,14 @@ rustls-pki-types = "1.14"
 rustls-platform-verifier = "0.7.0"
 sea-query = { version = "1.0.1", default-features = false, features = ["backend-sqlite", "derive"] }
 sea-query-rusqlite = "0.8.0"
-selectors = { version = "0.41" }
+selectors = { git = "https://github.com/minghuaw/stylo", rev = "f23fea55f1774ff880f6c370e960c96d1923bd33" }
 serde = "1.0.228"
 serde_bytes = "0.11"
 serde_core = "1.0.226"
 serde_json = "1.0"
 serde_test = "1.0"
 serde_with = "3.13"
-servo_arc = { version = "0.5.0" }
+servo_arc = { git = "https://github.com/minghuaw/stylo", rev = "f23fea55f1774ff880f6c370e960c96d1923bd33" }
 sha1 = "0.11"
 sha2 = "0.11"
 sha3 = "0.12"
@@ -238,12 +239,12 @@ speexdsp-resampler = "0.1.0"
 sponge-cursor = "0.1"
 string_cache = "0.11"
 strum = { version = "0.28", features = ["derive"] }
-stylo = { version = "0.22" }
-stylo_atoms = { version = "0.22" }
-stylo_dom = { version = "0.22" }
-stylo_malloc_size_of = { version = "0.22" }
-stylo_static_prefs = { version = "0.22" }
-stylo_traits = { version = "0.22" }
+stylo = { git = "https://github.com/minghuaw/stylo", rev = "f23fea55f1774ff880f6c370e960c96d1923bd33" }
+stylo_atoms = { git = "https://github.com/minghuaw/stylo", rev = "f23fea55f1774ff880f6c370e960c96d1923bd33" }
+stylo_dom = { git = "https://github.com/minghuaw/stylo", rev = "f23fea55f1774ff880f6c370e960c96d1923bd33" }
+stylo_malloc_size_of = { git = "https://github.com/minghuaw/stylo", rev = "f23fea55f1774ff880f6c370e960c96d1923bd33" }
+stylo_static_prefs = { git = "https://github.com/minghuaw/stylo", rev = "f23fea55f1774ff880f6c370e960c96d1923bd33" }
+stylo_traits = { git = "https://github.com/minghuaw/stylo", rev = "f23fea55f1774ff880f6c370e960c96d1923bd33" }
 surfman = "0.14.0"
 swapper = "0.1"
 syn = { version = "2", default-features = false, features = ["clone-impls", "derive", "parsing"] }
