@@ -816,6 +816,11 @@ struct InlineContainerState {
     font_metrics: Arc<FontMetrics>,
 }
 
+/// The maximum number of lines that `text-wrap-style: balance` will try to balance. This
+/// mirrors Gecko's `layout.css.text-wrap-balance.limit` pref and bounds the number of
+/// trial reflows performed for very tall blocks.
+const MAX_BALANCE_LINE_COUNT: i32 = 10;
+
 /// Counts the number of inline line boxes in a set of [`Fragment`]s. Only the top-level
 /// line boxes produced by this inline formatting context are counted.
 fn count_inline_lines(fragments: &[Fragment]) -> i32 {
@@ -2139,8 +2144,9 @@ impl InlineFormattingContext {
 
         let initial = trial(Au::zero());
         let target_line_count = count_inline_lines(&initial.fragments);
-        // Balancing only makes sense when there is more than one line.
-        if target_line_count < 2 {
+        // Balancing only makes sense when there is more than one line, and it is skipped
+        // for very tall blocks (like Gecko's balance limit) to bound the number of trials.
+        if !(2..=MAX_BALANCE_LINE_COUNT).contains(&target_line_count) {
             return self.layout_with_inset(
                 layout_context,
                 positioning_context,
