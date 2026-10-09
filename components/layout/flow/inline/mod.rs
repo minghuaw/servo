@@ -106,6 +106,7 @@ use servo_base::text::{Utf8CodeUnits, Utf32CodeUnits};
 use style::Zero;
 use style::computed_values::line_break::T as LineBreak;
 use style::computed_values::text_wrap_mode::T as TextWrapMode;
+use style::computed_values::text_wrap_style::T as TextWrapStyle;
 use style::computed_values::white_space_collapse::T as WhiteSpaceCollapse;
 use style::computed_values::word_break::T as WordBreak;
 use style::context::{QuirksMode, SharedStyleContext};
@@ -815,6 +816,17 @@ struct InlineContainerState {
     font_metrics: Arc<FontMetrics>,
 }
 
+/// Counts the number of inline line boxes in a set of [`Fragment`]s. Only the top-level
+/// line boxes produced by this inline formatting context are counted.
+fn count_inline_lines(fragments: &[Fragment]) -> i32 {
+    fragments
+        .iter()
+        .filter(|fragment| {
+            matches!(fragment, Fragment::Positioning(positioning) if positioning.is_line_box())
+        })
+        .count() as i32
+}
+
 struct InlineFormattingContextLayout<'layout_data> {
     positioning_context: &'layout_data mut PositioningContext,
     placement_state: PlacementState<'layout_data>,
@@ -916,6 +928,13 @@ struct InlineFormattingContextLayout<'layout_data> {
     /// Whether block-level boxes inside this inline formatting context should ignore their
     /// margins for the purpose of stretching in the block axis.
     ignore_block_margins_for_stretch: LogicalSides1D<bool>,
+
+    /// The amount by which to shorten the available inline size of every line in this
+    /// inline formatting context. This implements the `text-wrap-style: balance`
+    /// behavior by pushing content down to fill later lines. Only the space available
+    /// for line breaking is affected; the line box (and thus text alignment) still
+    /// uses the full containing block inline size.
+    inset: Au,
 }
 
 impl InlineFormattingContextLayout<'_> {
@@ -1515,6 +1534,12 @@ impl InlineFormattingContextLayout<'_> {
                 block: MAX_AU,
             }
         };
+        // Apply the `text-wrap: balance` inset. It only shortens the space available
+        // for line breaking; the line box keeps the full containing block inline size.
+        let available_line_space = LogicalVec2 {
+            inline: available_line_space.inline - self.inset,
+            block: available_line_space.block,
+        };
 
         let inline_would_overflow = potential_line_size.inline > available_line_space.inline;
         let block_would_overflow = potential_line_size.block > available_line_space.block;
@@ -2067,6 +2092,12 @@ impl InlineFormattingContext {
             .to_used_value(containing_block.size.inline.unwrap_or_default())
     }
 
+    /// Lay out this inline formatting context, applying the `text-wrap-style: balance`
+    /// behavior if it is requested. Balancing is implemented by performing trial layouts
+    /// that shorten the available inline size of the lines (the "inset") and choosing the
+    /// largest inset that does not change the number of lines or the block size. Trials
+    /// use a scratch positioning context and a snapshot of the float state so that they
+    /// leave no side effects behind.
     pub(super) fn layout(
         &self,
         layout_context: &LayoutContext,
@@ -2076,6 +2107,97 @@ impl InlineFormattingContext {
         collapsible_with_parent_start_margin: CollapsibleWithParentStartMargin,
         ignore_block_margins_for_stretch: LogicalSides1D<bool>,
     ) -> IndependentFormattingContextLayoutResult {
+        if containing_block.style.get_inherited_text().text_wrap_style != TextWrapStyle::Balance {
+            return self.layout_with_inset(
+                layout_context,
+                positioning_context,
+                containing_block,
+                sequential_layout_state,
+                collapsible_with_parent_start_margin,
+                ignore_block_margins_for_stretch,
+                Au::zero(),
+            );
+        }
+
+        // Snapshot the float state so that trial layouts can be discarded.
+        let state_snapshot = sequential_layout_state
+            .as_ref()
+            .map(|state| (**state).clone());
+        let trial = |inset: Au| {
+            let mut scratch_positioning_context = PositioningContext::default();
+            let mut trial_state = state_snapshot.clone();
+            self.layout_with_inset(
+                layout_context,
+                &mut scratch_positioning_context,
+                containing_block,
+                trial_state.as_mut(),
+                collapsible_with_parent_start_margin,
+                ignore_block_margins_for_stretch,
+                inset,
+            )
+        };
+
+        let initial = trial(Au::zero());
+        let target_line_count = count_inline_lines(&initial.fragments);
+        // Balancing only makes sense when there is more than one line.
+        if target_line_count < 2 {
+            return self.layout_with_inset(
+                layout_context,
+                positioning_context,
+                containing_block,
+                sequential_layout_state,
+                collapsible_with_parent_start_margin,
+                ignore_block_margins_for_stretch,
+                Au::zero(),
+            );
+        }
+        let target_block_size = initial.content_block_size;
+
+        let mut inset = containing_block.size.inline / target_line_count;
+        let mut step = inset / 2;
+        loop {
+            let success = inset <= Au::zero() || {
+                let result = trial(inset);
+                count_inline_lines(&result.fragments) == target_line_count &&
+                    result.content_block_size == target_block_size
+            };
+            if step > Au::zero() {
+                inset = if success { inset + step } else { inset - step };
+                step /= 2;
+            } else if inset <= Au::zero() || success {
+                break;
+            } else {
+                inset -= Au::from_f32_px(1.0);
+            }
+        }
+
+        self.layout_with_inset(
+            layout_context,
+            positioning_context,
+            containing_block,
+            sequential_layout_state,
+            collapsible_with_parent_start_margin,
+            ignore_block_margins_for_stretch,
+            inset,
+        )
+    }
+
+    fn layout_with_inset(
+        &self,
+        layout_context: &LayoutContext,
+        positioning_context: &mut PositioningContext,
+        containing_block: &ContainingBlock,
+        sequential_layout_state: Option<&mut SequentialLayoutState>,
+        collapsible_with_parent_start_margin: CollapsibleWithParentStartMargin,
+        ignore_block_margins_for_stretch: LogicalSides1D<bool>,
+        inset: Au,
+    ) -> IndependentFormattingContextLayoutResult {
+        let inset = if inset < Au::zero() {
+            Au::zero()
+        } else {
+            inset
+        };
+
         // Clear any cached inline fragments from previous layouts.
         for inline_box in self.inline_boxes.iter() {
             inline_box.borrow().base.clear_fragments();
@@ -2124,6 +2246,7 @@ impl InlineFormattingContext {
             white_space_collapse: style_text.white_space_collapse,
             text_wrap_mode: style_text.text_wrap_mode,
             ignore_block_margins_for_stretch,
+            inset,
         };
 
         for item in self.inline_items.iter() {
