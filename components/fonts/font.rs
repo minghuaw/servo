@@ -621,6 +621,18 @@ impl Font {
         result
     }
 
+    /// Whether synthetic small-caps may be used for this font, i.e. the value of
+    /// `font-synthesis-small-caps` is `auto`.
+    #[cfg(feature = "ht_ai_gen")]
+    fn allow_synthetic_small_caps(&self) -> bool {
+        matches!(self.descriptor.synthesis_small_caps, FontSynthesis::Auto)
+    }
+
+    #[cfg(not(feature = "ht_ai_gen"))]
+    fn allow_synthetic_small_caps(&self) -> bool {
+        true
+    }
+
     #[inline]
     pub fn glyph_index(&self, codepoint: char) -> Option<GlyphId> {
         {
@@ -630,8 +642,10 @@ impl Font {
             }
         }
         let codepoint = match self.descriptor.variant {
-            font_variant_caps::T::SmallCaps => codepoint.to_ascii_uppercase(),
-            font_variant_caps::T::Normal => codepoint,
+            font_variant_caps::T::SmallCaps if self.allow_synthetic_small_caps() => {
+                codepoint.to_ascii_uppercase()
+            },
+            _ => codepoint,
         };
         let glyph_index = self.handle.glyph_index(codepoint);
 

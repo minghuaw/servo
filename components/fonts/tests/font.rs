@@ -45,6 +45,7 @@ fn make_font(path: PathBuf) -> Font {
         pt_size: Au::from_px(24),
         variation_settings: vec![],
         synthesis_weight: FontSynthesis::Auto,
+        synthesis_small_caps: FontSynthesis::Auto,
         optical_sizing: FontOpticalSizing::Auto,
     };
     Font::new(FontTemplateRef::new(template), descriptor, Some(data), None).unwrap()
