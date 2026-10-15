@@ -1304,6 +1304,33 @@ impl BoxFragment {
         })
     }
 
+    /// Returns the reference box used to resolve the transform and its origin,
+    /// as selected by `transform-box`.
+    ///
+    /// For elements with an associated CSS layout box, the used value of
+    /// `fill-box` is `content-box` and of `stroke-box` and `view-box` is
+    /// `border-box`.
+    /// <https://drafts.csswg.org/css-transforms-1/#transform-box>
+    #[cfg(feature = "ht_ai_gen")]
+    fn transform_reference_rect(&self, border_rect: &Rect<Au, CSSPixel>) -> Rect<Au, CSSPixel> {
+        use style::values::computed::TransformBox;
+
+        match self.style().get_box().transform_box {
+            TransformBox::ContentBox | TransformBox::FillBox => {
+                let offset = self.content_rect().origin - self.border_rect().origin;
+                border_rect.translate(offset)
+            },
+            TransformBox::BorderBox | TransformBox::StrokeBox | TransformBox::ViewBox => {
+                *border_rect
+            },
+        }
+    }
+
+    #[cfg(not(feature = "ht_ai_gen"))]
+    fn transform_reference_rect(&self, border_rect: &Rect<Au, CSSPixel>) -> Rect<Au, CSSPixel> {
+        *border_rect
+    }
+
     /// Returns the 4D matrix representing this fragment's transform.
     pub fn calculate_transform_matrix(
         &self,
@@ -1311,7 +1338,9 @@ impl BoxFragment {
     ) -> Option<LayoutTransform> {
         let style = self.style();
         let list = &style.get_box().transform;
-        let length_rect = au_rect_to_length_rect(border_rect);
+        let reference_rect = self.transform_reference_rect(border_rect);
+        let reference_offset = reference_rect.origin - border_rect.origin;
+        let length_rect = au_rect_to_length_rect(&reference_rect);
         // https://drafts.csswg.org/css-transforms-2/#individual-transforms
         let rotate = match style.clone_rotate() {
             GenericRotate::Rotate(angle) => (0., 0., 1., angle),
@@ -1347,12 +1376,14 @@ impl BoxFragment {
         let transform_origin = &style.get_box().transform_origin;
         let transform_origin_x = transform_origin
             .horizontal
-            .to_used_value(border_rect.size.width)
-            .to_f32_px();
+            .to_used_value(reference_rect.size.width)
+            .to_f32_px() +
+            reference_offset.x.to_f32_px();
         let transform_origin_y = transform_origin
             .vertical
-            .to_used_value(border_rect.size.height)
-            .to_f32_px();
+            .to_used_value(reference_rect.size.height)
+            .to_f32_px() +
+            reference_offset.y.to_f32_px();
         let transform_origin_z = transform_origin.depth.px();
 
         Some(transform.change_basis(transform_origin_x, transform_origin_y, transform_origin_z))
