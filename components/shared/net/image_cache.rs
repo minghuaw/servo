@@ -217,6 +217,12 @@ pub trait ImageCache: Sync + Send {
         cors_setting: Option<CorsSettings>,
     ) -> ImageCacheResult;
 
+    /// Create and upload an RGBA8 mask texture derived from `source` whose red channel carries
+    /// the mask value (alpha, or luminance when `luminance` is set), and return its [`ImageKey`].
+    /// Used by the `mask-image` paint path, because WebRender image-mask clips sample the red
+    /// channel — feeding a decoded RGBA image directly would use its red, not its alpha.
+    fn create_mask_image_key(&self, source: &RasterImage, luminance: bool) -> Option<ImageKey>;
+
     /// Returns `Some` if the given `image_id` has already been rasterized at the given `size`.
     /// Otherwise, triggers a new job to perform the rasterization. If a notification
     /// is needed after rasterization is completed, the `add_rasterization_complete_listener`

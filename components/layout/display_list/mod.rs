@@ -437,16 +437,10 @@ impl DisplayListBuilder<'_> {
             _ => return None,
         };
 
-        let scale = self.device_pixel_ratio.get();
-        let preferred_size = Size2D::new(
-            (mask.rect.width() * scale) as i32,
-            (mask.rect.height() * scale) as i32,
-        );
-        let image_key = self.image_resolver.image_key_from_cached_image(
-            &image,
-            preferred_size,
-            Some(mask.node),
-        )?;
+        // WebRender image-mask clips sample the mask texture's red channel, so use an RGBA8
+        // texture whose red channel carries the source image's alpha (CSS `mask-mode: alpha`,
+        // the default for an `<image>` mask) instead of the raw image.
+        let image_key = self.image_resolver.mask_image_key(&image, mask.node, false)?;
         let spatial_id = self.spatial_id(clip.parent_scroll_node_id);
         Some(self.wr().define_clip_image_mask(
             spatial_id,

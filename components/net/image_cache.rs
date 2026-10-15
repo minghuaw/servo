@@ -30,12 +30,13 @@ use profile_traits::path;
 use resvg::tiny_skia;
 use resvg::usvg::{self, fontdb};
 use rustc_hash::{FxHashMap, FxHashSet};
+use servo_base::generic_channel::GenericSharedMemory;
 use servo_base::id::{PipelineId, WebViewId};
 use servo_base::threadpool::ThreadPool;
 use servo_url::{ImmutableOrigin, ServoUrl};
 use uuid::Uuid;
-use webrender_api::ImageKey as WebRenderImageKey;
-use webrender_api::units::DeviceIntSize;
+use webrender_api::{ImageDescriptor, ImageDescriptorFlags, ImageFormat};
+use webrender_api::{ImageKey as WebRenderImageKey, units::DeviceIntSize};
 
 use crate::image_cache::KeyCacheState::PipelineClosed;
 
@@ -940,6 +941,30 @@ impl ImageCache for ImageCacheImpl {
         store
             .paint_api
             .generate_image_key_blocking(store.webview_id)
+    }
+
+    fn create_mask_image_key(
+        &self,
+        source: &RasterImage,
+        luminance: bool,
+    ) -> Option<WebRenderImageKey> {
+        let (bytes, width, height) = source.mask_rgba8(luminance);
+        if width == 0 || height == 0 || bytes.is_empty() {
+            return None;
+        }
+
+        let image_key = self.get_image_key()?;
+        let descriptor = ImageDescriptor {
+            size: DeviceIntSize::new(width as i32, height as i32),
+            stride: None,
+            format: ImageFormat::RGBA8,
+            offset: 0,
+            flags: ImageDescriptorFlags::empty(),
+        };
+        let data = SerializableImageData::Raw(GenericSharedMemory::from_vec(bytes));
+        let store = self.store.lock();
+        store.paint_api.add_image(image_key, descriptor, data, false);
+        Some(image_key)
     }
 
     fn get_image(
