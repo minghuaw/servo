@@ -440,7 +440,9 @@ impl DisplayListBuilder<'_> {
         // WebRender image-mask clips sample the mask texture's red channel, so use an RGBA8
         // texture whose red channel carries the source image's alpha (CSS `mask-mode: alpha`,
         // the default for an `<image>` mask) instead of the raw image.
-        let image_key = self.image_resolver.mask_image_key(&image, mask.node, false)?;
+        let image_key = self
+            .image_resolver
+            .mask_image_key(&image, mask.node, false)?;
         let spatial_id = self.spatial_id(clip.parent_scroll_node_id);
         Some(self.wr().define_clip_image_mask(
             spatial_id,

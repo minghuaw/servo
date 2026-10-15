@@ -35,8 +35,10 @@ use servo_base::id::{PipelineId, WebViewId};
 use servo_base::threadpool::ThreadPool;
 use servo_url::{ImmutableOrigin, ServoUrl};
 use uuid::Uuid;
-use webrender_api::{ImageDescriptor, ImageDescriptorFlags, ImageFormat};
-use webrender_api::{ImageKey as WebRenderImageKey, units::DeviceIntSize};
+use webrender_api::units::DeviceIntSize;
+use webrender_api::{
+    ImageDescriptor, ImageDescriptorFlags, ImageFormat, ImageKey as WebRenderImageKey,
+};
 
 use crate::image_cache::KeyCacheState::PipelineClosed;
 
@@ -963,7 +965,9 @@ impl ImageCache for ImageCacheImpl {
         };
         let data = SerializableImageData::Raw(GenericSharedMemory::from_vec(bytes));
         let store = self.store.lock();
-        store.paint_api.add_image(image_key, descriptor, data, false);
+        store
+            .paint_api
+            .add_image(image_key, descriptor, data, false);
         Some(image_key)
     }
 

@@ -301,21 +301,18 @@ impl ImageResolver {
         luminance: bool,
     ) -> Option<ImageKey> {
         match image {
-            CachedImage::Raster(raster_image) => {
-                self.image_cache.create_mask_image_key(raster_image, luminance)
-            },
+            CachedImage::Raster(raster_image) => self
+                .image_cache
+                .create_mask_image_key(raster_image, luminance),
             CachedImage::Vector(vector_image) => {
                 let size = DeviceIntSize::new(
                     vector_image.metadata.width as i32,
                     vector_image.metadata.height as i32,
                 );
-                let raster_image = self.rasterize_vector_image(
-                    vector_image.id,
-                    size,
-                    node,
-                    vector_image.svg_id,
-                )?;
-                self.image_cache.create_mask_image_key(&raster_image, luminance)
+                let raster_image =
+                    self.rasterize_vector_image(vector_image.id, size, node, vector_image.svg_id)?;
+                self.image_cache
+                    .create_mask_image_key(&raster_image, luminance)
             },
         }
     }
