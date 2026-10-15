@@ -244,10 +244,18 @@ impl FontContext {
         font_template: FontTemplateRef,
         font_descriptor: &FontDescriptor,
     ) -> Option<FontRef> {
+        #[cfg(feature = "ht_ai_gen")]
+        let synthesize_small_caps = matches!(
+            font_descriptor.synthesis_small_caps,
+            style::values::computed::FontSynthesis::Auto
+        );
+        #[cfg(not(feature = "ht_ai_gen"))]
+        let synthesize_small_caps = true;
+
         self.get_font_maybe_synthesizing_small_caps(
             font_template,
             font_descriptor,
-            true, /* synthesize_small_caps */
+            synthesize_small_caps,
         )
     }
 

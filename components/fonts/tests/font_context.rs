@@ -336,6 +336,7 @@ mod font_context {
             pt_size: Au(10),
             variation_settings: vec![],
             synthesis_weight: FontSynthesis::Auto,
+            synthesis_small_caps: FontSynthesis::Auto,
             optical_sizing: FontOpticalSizing::Auto,
         };
 
