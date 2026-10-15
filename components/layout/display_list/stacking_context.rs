@@ -741,6 +741,32 @@ impl BoxFragment {
             )
             .or(clip_id);
 
+        // `mask-image` clips the element's rendered content through a WebRender image
+        // mask. Only the first non-`none` mask layer is used and the image is resolved
+        // lazily during WebRender display list construction.
+        #[cfg(feature = "ht_ai_gen")]
+        let clip_id = {
+            let mask_layer = style
+                .get_svg()
+                .mask_image
+                .0
+                .iter()
+                .find(|image| !matches!(**image, style::values::computed::Image::None));
+            match (mask_layer, with_style.base.tag) {
+                (Some(image), Some(tag)) => {
+                    Some(stacking_context_tree.clip_store.add_for_mask_image(
+                        image,
+                        tag.node,
+                        spatial_id.unwrap_or(containing_block.scroll_node_id),
+                        clip_id.unwrap_or(containing_block.clip_id),
+                        with_style,
+                        containing_block.rect.origin,
+                    ))
+                },
+                _ => clip_id,
+            }
+        };
+
         let containing_block = if clip_id.is_some() || spatial_id.is_some() {
             if let Some(clip_id) = clip_id {
                 self.set_generated_clip_id(clip_id);

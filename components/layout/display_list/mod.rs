@@ -374,6 +374,23 @@ impl DisplayListBuilder<'_> {
             "Clips should be added in order"
         );
 
+        // `mask-image` clips are turned into WebRender image-mask clips. When the mask
+        // layer cannot be represented as an image mask (a gradient, or an unloaded
+        // image) we fall through to the rounded-rectangle path below, which clips the
+        // element to the mask painting area.
+        #[cfg(feature = "ht_ai_gen")]
+        if let Some(new_clip_id) = self.wr_image_mask_clip(clip) {
+            let parent_clip_chain_id = match self.clip_chain_id(clip.parent_clip_id) {
+                ClipChainId::INVALID => None,
+                parent => Some(parent),
+            };
+            let clip_chain_id = self
+                .wr()
+                .define_clip_chain(parent_clip_chain_id, [new_clip_id]);
+            self.clip_map.push(clip_chain_id);
+            return clip_chain_id;
+        }
+
         let spatial_id = self.spatial_id(clip.parent_scroll_node_id);
         let new_clip_id = if clip.radii.is_zero() {
             self.wr().define_clip_rect(spatial_id, clip.rect)
@@ -403,6 +420,45 @@ impl DisplayListBuilder<'_> {
         clip_chain_id
     }
 
+    /// Resolve a `mask-image` clip into a WebRender image-mask clip, if possible.
+    ///
+    /// Returns `None` for ordinary (rounded rectangle) clips and for mask layers that
+    /// cannot be represented as a WebRender image mask — notably gradients and SVG
+    /// `<mask-source>` references, which the pinned WebRender API does not support.
+    #[cfg(feature = "ht_ai_gen")]
+    fn wr_image_mask_clip(&mut self, clip: &Clip) -> Option<wr::ClipId> {
+        let mask = clip.image_mask.as_ref()?;
+        let resolved = self
+            .image_resolver
+            .resolve_image(Some(mask.node), &mask.image)
+            .ok()?;
+        let image = match resolved {
+            ResolvedImage::Image { image, .. } => image,
+            _ => return None,
+        };
+
+        let scale = self.device_pixel_ratio.get();
+        let preferred_size = Size2D::new(
+            (mask.rect.width() * scale) as i32,
+            (mask.rect.height() * scale) as i32,
+        );
+        let image_key = self.image_resolver.image_key_from_cached_image(
+            &image,
+            preferred_size,
+            Some(mask.node),
+        )?;
+        let spatial_id = self.spatial_id(clip.parent_scroll_node_id);
+        Some(self.wr().define_clip_image_mask(
+            spatial_id,
+            wr::ImageMask {
+                image: image_key,
+                rect: mask.rect,
+            },
+            &[],
+            wr::FillRule::Nonzero,
+        ))
+    }
+
     /// Add a new clip to the WebRender display list being built. This only happens during
     /// WebRender display list building and these clips should be added after all clips
     /// from the `StackingContextTree` have already been processed.
@@ -423,6 +479,8 @@ impl DisplayListBuilder<'_> {
             rect,
             parent_scroll_node_id: state.spatial_id,
             parent_clip_id: state.clip_id,
+            #[cfg(feature = "ht_ai_gen")]
+            image_mask: None,
         }))
     }
 
@@ -472,6 +530,7 @@ impl DisplayListBuilder<'_> {
                     effects.mix_blend_mode == ComputedMixBlendMode::Normal &&
                     !style.has_effective_transform_or_perspective(FragmentFlags::empty()) &&
                     style.get_svg().clip_path == ComputedClipPath::None &&
+                    !style.has_mask_image() &&
                     transform_style == TransformStyle::Flat
                 {
                     return false;
