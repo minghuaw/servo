@@ -67,6 +67,10 @@ pub(crate) struct ClipImageMask {
     /// The rectangle in the parent spatial node's coordinate space that the mask
     /// image is stretched over (the mask painting area).
     pub rect: LayoutRect,
+    /// Number of non-`none` layers in the `mask-image` list. Used to decide whether an
+    /// unresolvable layer masks the element out (single layer) or is ignored (a list,
+    /// where a later valid layer applies).
+    pub non_none_layers: usize,
 }
 
 /// A simple vector of [`Clip`] that is built during `StackingContextTree` construction.
@@ -116,6 +120,7 @@ impl StackingContextTreeClipStore {
         parent_clip_id: ClipId,
         box_fragment: &BoxFragmentWithStyle<'_>,
         containing_block_origin: PhysicalPoint<Au>,
+        non_none_layers: usize,
     ) -> ClipId {
         let fragment_builder = BuilderForBoxFragment::new(box_fragment, containing_block_origin);
         // The mask painting area defaults to the border box (`mask-clip: border-box`)
@@ -133,6 +138,7 @@ impl StackingContextTreeClipStore {
                 image: image.clone(),
                 node,
                 rect,
+                non_none_layers,
             }),
         });
         id

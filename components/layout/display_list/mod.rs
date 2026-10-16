@@ -437,8 +437,15 @@ impl DisplayListBuilder<'_> {
             // transparent image, which masks the element out entirely (css-images). Clip to
             // an empty rectangle to hide the element's content.
             Err(ResolveImageError::LoadError) => {
-                let spatial_id = self.spatial_id(clip.parent_scroll_node_id);
-                return Some(self.wr().define_clip_rect(spatial_id, LayoutRect::zero()));
+                // A single unresolvable `<image>` mask layer is fully transparent, so the
+                // element is masked out (css-images). In a layer list (`url(invalid), <valid>`)
+                // the invalid layer is ignored and a later layer applies — unmodelled here, so
+                // leave the element unmasked rather than hiding it.
+                if mask.non_none_layers <= 1 {
+                    let spatial_id = self.spatial_id(clip.parent_scroll_node_id);
+                    return Some(self.wr().define_clip_rect(spatial_id, LayoutRect::zero()));
+                }
+                return None;
             },
             // Gradients/colors/`<mask-source>`/pending/`none`: no image mask (leave unmasked).
             _ => return None,

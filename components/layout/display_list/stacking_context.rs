@@ -746,9 +746,13 @@ impl BoxFragment {
         // lazily during WebRender display list construction.
         #[cfg(feature = "ht_ai_gen")]
         let clip_id = {
-            let mask_layer = style
-                .get_svg()
-                .mask_image
+            let mask_image = &style.get_svg().mask_image;
+            let non_none_layers = mask_image
+                .0
+                .iter()
+                .filter(|image| !matches!(**image, style::values::computed::Image::None))
+                .count();
+            let mask_layer = mask_image
                 .0
                 .iter()
                 .find(|image| !matches!(**image, style::values::computed::Image::None));
@@ -761,6 +765,7 @@ impl BoxFragment {
                         clip_id.unwrap_or(containing_block.clip_id),
                         with_style,
                         containing_block.rect.origin,
+                        non_none_layers,
                     ))
                 },
                 _ => clip_id,
