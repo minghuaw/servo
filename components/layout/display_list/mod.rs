@@ -55,7 +55,7 @@ use webrender_api::{
 };
 use wr::units::LayoutVector2D;
 
-use crate::context::{ImageResolver, ResolvedImage};
+use crate::context::{ImageResolver, ResolveImageError, ResolvedImage};
 use crate::display_list::background::BackgroundPainter;
 use crate::display_list::conversions::FilterToWebRender;
 pub(crate) use crate::display_list::conversions::ToWebRender;
@@ -430,10 +430,17 @@ impl DisplayListBuilder<'_> {
         let mask = clip.image_mask.as_ref()?;
         let resolved = self
             .image_resolver
-            .resolve_image(Some(mask.node), &mask.image)
-            .ok()?;
+            .resolve_image(Some(mask.node), &mask.image);
         let image = match resolved {
-            ResolvedImage::Image { image, .. } => image,
+            Ok(ResolvedImage::Image { image, .. }) => image,
+            // A `mask-image` layer whose `<image>` fails to load is treated as a fully
+            // transparent image, which masks the element out entirely (css-images). Clip to
+            // an empty rectangle to hide the element's content.
+            Err(ResolveImageError::LoadError) => {
+                let spatial_id = self.spatial_id(clip.parent_scroll_node_id);
+                return Some(self.wr().define_clip_rect(spatial_id, LayoutRect::zero()));
+            },
+            // Gradients/colors/`<mask-source>`/pending/`none`: no image mask (leave unmasked).
             _ => return None,
         };
 
