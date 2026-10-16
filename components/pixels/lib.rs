@@ -506,6 +506,61 @@ impl RasterImage {
             is_opaque: self.is_opaque,
         })
     }
+
+    /// Build an RGBA8 buffer for the first frame whose red (and green/blue) channel carries
+    /// the mask value: the pixel alpha (for CSS `mask-mode: alpha`, the default for an
+    /// `<image>`) or its luminance. WebRender image-mask clips sample the **red** channel,
+    /// so this turns a decoded image into a correct `mask-image` coverage texture.
+    pub fn mask_rgba8(&self, luminance: bool) -> (Vec<u8>, u32, u32) {
+        let Some(frame) = self.frames.first() else {
+            return (Vec::new(), 0, 0);
+        };
+        let (width, height) = (frame.width, frame.height);
+        let src = &self.bytes[frame.byte_range.clone()];
+        let mut out = Vec::with_capacity(width as usize * height as usize * 4);
+        // Rec. 709 luma, integer approximation (sums to 256).
+        let lum = |r: u8, g: u8, b: u8| -> u8 {
+            ((54 * r as u32 + 183 * g as u32 + 19 * b as u32) >> 8) as u8
+        };
+        let (r_i, g_i, b_i): (usize, usize, usize) = match self.format {
+            PixelFormat::BGRA8 => (2, 1, 0),
+            _ => (0, 1, 2),
+        };
+        match self.format {
+            PixelFormat::RGBA8 | PixelFormat::BGRA8 => {
+                for px in src.chunks_exact(4) {
+                    let v = if luminance {
+                        lum(px[r_i], px[g_i], px[b_i])
+                    } else {
+                        px[3]
+                    };
+                    out.extend_from_slice(&[v, v, v, 0xff]);
+                }
+            },
+            PixelFormat::RGB8 => {
+                for px in src.chunks_exact(3) {
+                    let v = if luminance {
+                        lum(px[r_i], px[g_i], px[b_i])
+                    } else {
+                        0xff
+                    };
+                    out.extend_from_slice(&[v, v, v, 0xff]);
+                }
+            },
+            PixelFormat::K8 => {
+                for &k in src.iter() {
+                    out.extend_from_slice(&[k, k, k, 0xff]);
+                }
+            },
+            PixelFormat::KA8 => {
+                for px in src.chunks_exact(2) {
+                    let v = if luminance { px[0] } else { px[1] };
+                    out.extend_from_slice(&[v, v, v, 0xff]);
+                }
+            },
+        }
+        (out, width, height)
+    }
 }
 
 impl fmt::Debug for RasterImage {

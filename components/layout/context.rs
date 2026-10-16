@@ -289,6 +289,34 @@ impl ImageResolver {
         }
     }
 
+    /// Create an RGBA8 mask texture from a cached image whose red channel carries the mask
+    /// value (alpha, or luminance when `luminance` is set), and return its WebRender [`ImageKey`].
+    /// Raster images are converted directly; SVG/vector images are first rasterized at their
+    /// natural size (returning `None` until that asynchronous rasterization completes).
+    #[cfg(feature = "ht_ai_gen")]
+    pub(crate) fn mask_image_key(
+        &self,
+        image: &CachedImage,
+        node: OpaqueNode,
+        luminance: bool,
+    ) -> Option<ImageKey> {
+        match image {
+            CachedImage::Raster(raster_image) => self
+                .image_cache
+                .create_mask_image_key(raster_image, luminance),
+            CachedImage::Vector(vector_image) => {
+                let size = DeviceIntSize::new(
+                    vector_image.metadata.width as i32,
+                    vector_image.metadata.height as i32,
+                );
+                let raster_image =
+                    self.rasterize_vector_image(vector_image.id, size, node, vector_image.svg_id)?;
+                self.image_cache
+                    .create_mask_image_key(&raster_image, luminance)
+            },
+        }
+    }
+
     pub(crate) fn queue_svg_element_for_serialization(&self, element: ServoLayoutNode<'_>) {
         self.pending_svg_elements_for_serialization
             .lock()
