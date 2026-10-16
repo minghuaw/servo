@@ -25,7 +25,7 @@ use style::computed_values::position::T as ComputedPosition;
 use style::computed_values::text_decoration_style::T as TextDecorationStyle;
 use style::computed_values::text_decoration_thickness::T as TextDecorationThickness;
 use style::values::computed::angle::Angle;
-use style::values::computed::{ClipRectOrAuto, Length, TextDecorationLine};
+use style::values::computed::{ClipRectOrAuto, Image as ComputedImage, Length, TextDecorationLine};
 use style::values::generics::box_::{OverflowClipMarginBox, Perspective};
 use style::values::generics::transform::{
     self, GenericRotate, GenericScale, GenericTranslate, get_normalized_vector_and_angle,
@@ -746,26 +746,23 @@ impl BoxFragment {
         // lazily during WebRender display list construction.
         #[cfg(feature = "ht_ai_gen")]
         let clip_id = {
-            let mask_image = &style.get_svg().mask_image;
-            let non_none_layers = mask_image
+            let mask_images: Vec<_> = style
+                .get_svg()
+                .mask_image
                 .0
                 .iter()
-                .filter(|image| !matches!(**image, style::values::computed::Image::None))
-                .count();
-            let mask_layer = mask_image
-                .0
-                .iter()
-                .find(|image| !matches!(**image, style::values::computed::Image::None));
-            match (mask_layer, with_style.base.tag) {
-                (Some(image), Some(tag)) => {
+                .filter(|image| !matches!(**image, ComputedImage::None))
+                .cloned()
+                .collect();
+            match with_style.base.tag {
+                Some(tag) if !mask_images.is_empty() => {
                     Some(stacking_context_tree.clip_store.add_for_mask_image(
-                        image,
+                        mask_images,
                         tag.node,
                         spatial_id.unwrap_or(containing_block.scroll_node_id),
                         clip_id.unwrap_or(containing_block.clip_id),
                         with_style,
                         containing_block.rect.origin,
-                        non_none_layers,
                     ))
                 },
                 _ => clip_id,

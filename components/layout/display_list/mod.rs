@@ -428,45 +428,47 @@ impl DisplayListBuilder<'_> {
     #[cfg(feature = "ht_ai_gen")]
     fn wr_image_mask_clip(&mut self, clip: &Clip) -> Option<wr::ClipId> {
         let mask = clip.image_mask.as_ref()?;
-        let resolved = self
-            .image_resolver
-            .resolve_image(Some(mask.node), &mask.image);
-        let image = match resolved {
-            Ok(ResolvedImage::Image { image, .. }) => image,
-            // A `mask-image` layer whose `<image>` fails to load is treated as a fully
-            // transparent image, which masks the element out entirely (css-images). Clip to
-            // an empty rectangle to hide the element's content.
-            Err(ResolveImageError::LoadError) => {
-                // A single unresolvable `<image>` mask layer is fully transparent, so the
-                // element is masked out (css-images). In a layer list (`url(invalid), <valid>`)
-                // the invalid layer is ignored and a later layer applies — unmodelled here, so
-                // leave the element unmasked rather than hiding it.
-                if mask.non_none_layers <= 1 {
-                    let spatial_id = self.spatial_id(clip.parent_scroll_node_id);
-                    return Some(self.wr().define_clip_rect(spatial_id, LayoutRect::zero()));
-                }
-                return None;
-            },
-            // Gradients/colors/`<mask-source>`/pending/`none`: no image mask (leave unmasked).
-            _ => return None,
-        };
+        let mut failed = false;
+        let mut unrenderable = false;
+        for image in &mask.images {
+            match self.image_resolver.resolve_image(Some(mask.node), image) {
+                Ok(ResolvedImage::Image { image, .. }) => {
+                    // WebRender image-mask clips sample the mask texture's red channel, so use
+                    // a texture whose red channel carries the source image's alpha (CSS
+                    // `mask-mode: alpha`, the default for an `<image>` mask), not the raw image.
+                    if let Some(image_key) =
+                        self.image_resolver.mask_image_key(&image, mask.node, false)
+                    {
+                        let spatial_id = self.spatial_id(clip.parent_scroll_node_id);
+                        return Some(self.wr().define_clip_image_mask(
+                            spatial_id,
+                            wr::ImageMask {
+                                image: image_key,
+                                rect: mask.rect,
+                            },
+                            &[],
+                            wr::FillRule::Nonzero,
+                        ));
+                    }
+                    // Resolved but no key yet (e.g. an SVG awaiting rasterization).
+                    unrenderable = true;
+                },
+                // Gradients/colors are valid mask layers we cannot render as an image mask.
+                Ok(_) => unrenderable = true,
+                Err(ResolveImageError::LoadError) => failed = true,
+                // Pending / `none` / other: a valid (or not-yet-resolved) layer.
+                Err(_) => unrenderable = true,
+            }
+        }
 
-        // WebRender image-mask clips sample the mask texture's red channel, so use an RGBA8
-        // texture whose red channel carries the source image's alpha (CSS `mask-mode: alpha`,
-        // the default for an `<image>` mask) instead of the raw image.
-        let image_key = self
-            .image_resolver
-            .mask_image_key(&image, mask.node, false)?;
-        let spatial_id = self.spatial_id(clip.parent_scroll_node_id);
-        Some(self.wr().define_clip_image_mask(
-            spatial_id,
-            wr::ImageMask {
-                image: image_key,
-                rect: mask.rect,
-            },
-            &[],
-            wr::FillRule::Nonzero,
-        ))
+        // No layer produced a mask texture. Hide the element only when every non-`none` layer
+        // was an unresolvable image (so the whole mask is transparent — css-images). If any
+        // layer was a valid-but-unrendered source, leave the element unmasked instead.
+        if failed && !unrenderable {
+            let spatial_id = self.spatial_id(clip.parent_scroll_node_id);
+            return Some(self.wr().define_clip_rect(spatial_id, LayoutRect::zero()));
+        }
+        None
     }
 
     /// Add a new clip to the WebRender display list being built. This only happens during
