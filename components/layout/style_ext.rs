@@ -366,6 +366,8 @@ pub(crate) trait ComputedValuesExt {
         padding_border_sums: &LogicalVec2<Au>,
     ) -> Option<AspectRatio>;
     fn background_is_transparent(&self) -> bool;
+    /// Whether or not this style specifies a non-`none` `mask-image` layer.
+    fn has_mask_image(&self) -> bool;
     fn get_webrender_primitive_flags(&self) -> wr::PrimitiveFlags;
     fn bidi_control_chars(&self) -> (&'static str, &'static str);
     fn resolve_align_self(
@@ -707,6 +709,7 @@ impl ComputedValuesExt for ComputedValues {
             !effects.filter.0.is_empty() ||
             !effects.clip.is_auto() ||
             self.get_svg().clip_path != ClipPath::None ||
+            self.has_mask_image() ||
             self.get_box().isolation == ComputedIsolation::Isolate ||
             effects.mix_blend_mode != ComputedMixBlendMode::Normal
         {
@@ -835,6 +838,13 @@ impl ComputedValuesExt for ComputedValues {
         // > A computed value of other than `none` results in the creation of a stacking context.
         // Note `will-change: clip-path` is handled above by `STACKING_CONTEXT_UNCONDITIONAL`.
         if self.get_svg().clip_path != ClipPath::None {
+            return true;
+        }
+
+        // From <https://drafts.fxtf.org/css-masking-1/#the-mask-image>
+        // > A computed value of other than `none` on the mask-image property results in
+        // > the creation of a stacking context.
+        if self.has_mask_image() {
             return true;
         }
 
@@ -1004,6 +1014,23 @@ impl ComputedValuesExt for ComputedValues {
                 })
             },
         }
+    }
+
+    /// Whether or not this style specifies a non-`none` `mask-image` layer, which
+    /// forces the element's contents into a compositing group. When the `ht_ai_gen`
+    /// feature is off this always returns `false`, keeping Servo behavior stock.
+    #[cfg(feature = "ht_ai_gen")]
+    fn has_mask_image(&self) -> bool {
+        self.get_svg()
+            .mask_image
+            .0
+            .iter()
+            .any(|layer| !matches!(layer, ComputedImageLayer::None))
+    }
+
+    #[cfg(not(feature = "ht_ai_gen"))]
+    fn has_mask_image(&self) -> bool {
+        false
     }
 
     /// Whether or not this style specifies a non-transparent background.

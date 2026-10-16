@@ -17,6 +17,9 @@ doctest = false
 
 [features]
 tracing = ["dep:tracing"]
+# Experiment-scoped umbrella gate for the mask-image paint consumer. Off means
+# Servo behavior is stock; the shared stylo un-gate is isolated by pin, not gated here.
+ht_ai_gen = []
 
 [dependencies]
 accesskit = { workspace = true }

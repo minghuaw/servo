@@ -45,6 +45,29 @@ pub(crate) struct Clip {
     pub rect: LayoutRect,
     pub parent_scroll_node_id: ScrollTreeNodeId,
     pub parent_clip_id: ClipId,
+    /// When set, this clip is produced by a `mask-image` layer instead of a rounded
+    /// rectangle. The mask image is resolved lazily when the WebRender display list is
+    /// constructed, because image resolution requires the [`DisplayListBuilder`]'s
+    /// [`ImageResolver`].
+    #[cfg(feature = "ht_ai_gen")]
+    pub(crate) image_mask: Option<ClipImageMask>,
+}
+
+/// A `mask-image` layer to be turned into a WebRender image-mask clip. This is the
+/// Servo-side equivalent of Gecko's `wr::ImageMask` produced by `BuildWrMaskImage`,
+/// limited to the single-image, border-box painting area case.
+#[cfg(feature = "ht_ai_gen")]
+#[derive(Clone, MallocSizeOf)]
+pub(crate) struct ClipImageMask {
+    /// The non-`none` layers of the `mask-image` list, in order. Kept so an unresolvable
+    /// layer can be distinguished from a valid-but-unrendered one (see `wr_image_mask_clip`).
+    #[ignore_malloc_size_of = "The computed Image type is not measured by layout"]
+    pub images: Vec<style::values::computed::Image>,
+    /// The node the image belongs to, used to resolve relative/remote URLs.
+    pub node: style::dom::OpaqueNode,
+    /// The rectangle in the parent spatial node's coordinate space that the mask
+    /// image is stretched over (the mask painting area).
+    pub rect: LayoutRect,
 }
 
 /// A simple vector of [`Clip`] that is built during `StackingContextTree` construction.
@@ -72,6 +95,42 @@ impl StackingContextTreeClipStore {
             rect,
             parent_scroll_node_id,
             parent_clip_id,
+            #[cfg(feature = "ht_ai_gen")]
+            image_mask: None,
+        });
+        id
+    }
+
+    /// Add a clip that masks the element's content using the first non-`none` layer of
+    /// its `mask-image` value. The image itself is resolved later, when the WebRender
+    /// display list is built (see `DisplayListBuilder::add_clip_to_display_list`).
+    ///
+    /// Servo has no SVG `<mask>` support and the pinned WebRender only supports image
+    /// masks, so `<mask-source>` values cannot be represented at all and gradient mask
+    /// layers are resolved (and skipped) at display-list construction time.
+    #[cfg(feature = "ht_ai_gen")]
+    pub(super) fn add_for_mask_image(
+        &mut self,
+        images: Vec<style::values::computed::Image>,
+        node: style::dom::OpaqueNode,
+        parent_scroll_node_id: ScrollTreeNodeId,
+        parent_clip_id: ClipId,
+        box_fragment: &BoxFragmentWithStyle<'_>,
+        containing_block_origin: PhysicalPoint<Au>,
+    ) -> ClipId {
+        let fragment_builder = BuilderForBoxFragment::new(box_fragment, containing_block_origin);
+        // The mask painting area defaults to the border box (`mask-clip: border-box`)
+        // and the mask image is placed at its origin (`mask-position: 0% 0%`,
+        // `mask-origin: border-box`) at its natural size (`mask-size: auto`).
+        let rect = fragment_builder.border_rect;
+        let id = ClipId(self.0.len());
+        self.0.push(Clip {
+            id,
+            radii: BorderRadius::zero(),
+            rect,
+            parent_scroll_node_id,
+            parent_clip_id,
+            image_mask: Some(ClipImageMask { images, node, rect }),
         });
         id
     }
