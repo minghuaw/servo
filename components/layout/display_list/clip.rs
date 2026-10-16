@@ -15,6 +15,8 @@ use style::values::generics::position::GenericPositionOrAuto;
 use webrender_api::BorderRadius;
 use webrender_api::units::{LayoutPoint, LayoutRect, LayoutSideOffsets, LayoutSize};
 
+#[cfg(feature = "ht_ai_gen")]
+use super::clip_shape::ClipShapeMask;
 use super::{BuilderForBoxFragment, compute_margin_box_radius};
 use crate::fragment_tree::BoxFragmentWithStyle;
 use crate::geom::PhysicalPoint;
@@ -45,6 +47,12 @@ pub(crate) struct Clip {
     pub rect: LayoutRect,
     pub parent_scroll_node_id: ScrollTreeNodeId,
     pub parent_clip_id: ClipId,
+    /// If set, this clip is not a rect/rounded-rect but an image mask rasterized
+    /// from a `clip-path` `<basic-shape>` (WebRender has no polygon clip
+    /// primitive). Only ever `Some` with the `ht_ai_gen` feature enabled.
+    #[cfg(feature = "ht_ai_gen")]
+    #[ignore_malloc_size_of = "clip-path shape masks are small and not tracked"]
+    pub shape_mask: Option<ClipShapeMask>,
 }
 
 /// A simple vector of [`Clip`] that is built during `StackingContextTree` construction.
@@ -72,6 +80,8 @@ impl StackingContextTreeClipStore {
             rect,
             parent_scroll_node_id,
             parent_clip_id,
+            #[cfg(feature = "ht_ai_gen")]
+            shape_mask: None,
         });
         id
     }
@@ -107,7 +117,13 @@ impl StackingContextTreeClipStore {
                         parent_scroll_node_id,
                         parent_clip_chain_id,
                     ),
-                BasicShape::Polygon(_) | BasicShape::PathOrShape(_) => None,
+                BasicShape::Polygon(_) | BasicShape::PathOrShape(_) => self
+                    .add_for_complex_basic_shape(
+                        shape,
+                        layout_rect,
+                        parent_scroll_node_id,
+                        parent_clip_chain_id,
+                    ),
             }
         } else {
             Some(self.add(
@@ -232,6 +248,44 @@ impl StackingContextTreeClipStore {
             },
             _ => None,
         }
+    }
+
+    /// Add a clip for a `polygon()`, `path()` or `shape()` `clip-path`. These
+    /// are rasterized into an image mask when the `ht_ai_gen` feature is enabled;
+    /// otherwise they are left unclipped, matching stock Servo.
+    #[cfg(feature = "ht_ai_gen")]
+    fn add_for_complex_basic_shape(
+        &mut self,
+        shape: &BasicShape,
+        layout_rect: LayoutRect,
+        parent_scroll_node_id: ScrollTreeNodeId,
+        parent_clip_chain_id: ClipId,
+    ) -> Option<ClipId> {
+        let reference_size =
+            euclid::Size2D::new(layout_rect.width() as f64, layout_rect.height() as f64);
+        let shape_mask = ClipShapeMask::from_basic_shape(shape, reference_size)?;
+
+        let id = ClipId(self.0.len());
+        self.0.push(Clip {
+            id,
+            radii: webrender_api::BorderRadius::zero(),
+            rect: layout_rect,
+            parent_scroll_node_id,
+            parent_clip_id: parent_clip_chain_id,
+            shape_mask: Some(shape_mask),
+        });
+        Some(id)
+    }
+
+    #[cfg(not(feature = "ht_ai_gen"))]
+    fn add_for_complex_basic_shape(
+        &mut self,
+        _shape: &BasicShape,
+        _layout_rect: LayoutRect,
+        _parent_scroll_node_id: ScrollTreeNodeId,
+        _parent_clip_chain_id: ClipId,
+    ) -> Option<ClipId> {
+        None
     }
 }
 

@@ -9,12 +9,18 @@ use std::sync::{Arc, LazyLock};
 use app_units::{AU_PER_PX, Au};
 use clip::Clip;
 pub(crate) use clip::ClipId;
+#[cfg(feature = "ht_ai_gen")]
+use clip_shape::ClipShapeMask;
 use euclid::{Box2D, Point2D, Rect, Scale, SideOffsets2D, Size2D, UnknownUnit, Vector2D};
 use fonts::ShapedTextSlice;
 use gradient::WebRenderGradient;
 use layout_api::ReflowStatistics;
+#[cfg(feature = "ht_ai_gen")]
+use paint_api::CrossProcessPaintApi;
 use paint_api::display_list::{PaintDisplayListInfo, SpatialTreeNodeInfo};
 use servo_arc::Arc as ServoArc;
+#[cfg(feature = "ht_ai_gen")]
+use servo_base::id::WebViewId;
 use servo_base::id::{PipelineId, ScrollTreeNodeId};
 use servo_config::opts::{DiagnosticsLogging, DiagnosticsLoggingOption};
 use servo_config::{pref, prefs};
@@ -73,6 +79,8 @@ use crate::style_ext::{BorderStyleColor, ComputedValuesExt};
 
 mod background;
 mod clip;
+#[cfg(feature = "ht_ai_gen")]
+mod clip_shape;
 mod conversions;
 mod gradient;
 mod hit_test;
@@ -80,6 +88,8 @@ mod paint_timing_handler;
 mod paint_traversal;
 mod stacking_context;
 
+#[cfg(feature = "ht_ai_gen")]
+pub(crate) use clip_shape::ShapeMaskImageCache;
 pub(crate) use hit_test::{ClosestFragmentSearch, HitTest};
 pub(crate) use paint_timing_handler::PaintTimingHandler;
 pub(crate) use stacking_context::*;
@@ -145,6 +155,19 @@ pub(crate) struct DisplayListBuilder<'a> {
     /// Whether or not the `WebView` this display list is being rendered for has system focus
     /// and is the focused frame in the frame tree.
     frame_focused: bool,
+
+    /// Cross-process access to the `Paint` API, used to upload the image masks
+    /// that back `clip-path` `<basic-shape>` clips. Only present with `ht_ai_gen`.
+    #[cfg(feature = "ht_ai_gen")]
+    paint_api: &'a CrossProcessPaintApi,
+
+    /// The `WebView` this display list belongs to, needed to request image keys.
+    #[cfg(feature = "ht_ai_gen")]
+    webview_id: WebViewId,
+
+    /// Cache of already-uploaded `clip-path` shape masks, keyed by content hash.
+    #[cfg(feature = "ht_ai_gen")]
+    shape_mask_cache: &'a RefCell<ShapeMaskImageCache>,
 }
 
 struct InspectorHighlight {
@@ -197,6 +220,9 @@ impl DisplayListBuilder<'_> {
         paint_timing_handler: &mut PaintTimingHandler,
         reflow_statistics: &mut ReflowStatistics,
         frame_focused: bool,
+        #[cfg(feature = "ht_ai_gen")] paint_api: &CrossProcessPaintApi,
+        #[cfg(feature = "ht_ai_gen")] webview_id: WebViewId,
+        #[cfg(feature = "ht_ai_gen")] shape_mask_cache: &RefCell<ShapeMaskImageCache>,
     ) -> BuiltDisplayList {
         // Build the rest of the display list which inclues all of the WebRender primitives.
         let paint_info = &mut stacking_context_tree.paint_info;
@@ -241,6 +267,12 @@ impl DisplayListBuilder<'_> {
             largest_contentful_paint_enabled: pref!(largest_contentful_paint_enabled),
             shell_background_color,
             frame_focused,
+            #[cfg(feature = "ht_ai_gen")]
+            paint_api,
+            #[cfg(feature = "ht_ai_gen")]
+            webview_id,
+            #[cfg(feature = "ht_ai_gen")]
+            shape_mask_cache,
         };
 
         // Clear any caret color from previous display list constructions.
@@ -375,6 +407,22 @@ impl DisplayListBuilder<'_> {
         );
 
         let spatial_id = self.spatial_id(clip.parent_scroll_node_id);
+        #[cfg(feature = "ht_ai_gen")]
+        let new_clip_id = if let Some(shape_mask) = &clip.shape_mask {
+            self.define_clip_shape_image_mask(spatial_id, clip, shape_mask)
+        } else if clip.radii.is_zero() {
+            self.wr().define_clip_rect(spatial_id, clip.rect)
+        } else {
+            self.wr().define_clip_rounded_rect(
+                spatial_id,
+                ComplexClipRegion {
+                    rect: clip.rect,
+                    radii: clip.radii,
+                    mode: ClipMode::Clip,
+                },
+            )
+        };
+        #[cfg(not(feature = "ht_ai_gen"))]
         let new_clip_id = if clip.radii.is_zero() {
             self.wr().define_clip_rect(spatial_id, clip.rect)
         } else {
@@ -403,6 +451,67 @@ impl DisplayListBuilder<'_> {
         clip_chain_id
     }
 
+    /// Define a WebRender clip for a `clip-path` `<basic-shape>` that is not a
+    /// rect/rounded-rect (i.e. a `polygon()`, `path()` or `shape()`). The shape is
+    /// rasterized into an alpha bitmap, uploaded as a WebRender image and used as
+    /// an image-mask clip, since WebRender has no polygon clip primitive.
+    #[cfg(feature = "ht_ai_gen")]
+    fn define_clip_shape_image_mask(
+        &mut self,
+        spatial_id: webrender_api::SpatialId,
+        clip: &Clip,
+        shape_mask: &ClipShapeMask,
+    ) -> webrender_api::ClipId {
+        let scale = self.device_pixel_ratio.get();
+        let scale_f64 = scale as f64;
+        let width = ((clip.rect.width() as f64) * scale_f64).round().max(1.0) as u32;
+        let height = ((clip.rect.height() as f64) * scale_f64).round().max(1.0) as u32;
+
+        let cache_key = shape_mask.cache_key(width, height, scale);
+        let cached = self.shape_mask_cache.borrow().get(&cache_key).copied();
+        let image_key = match cached {
+            Some(key) => key,
+            None => {
+                let Some(key) = self.paint_api.generate_image_key_blocking(self.webview_id) else {
+                    // Without an image key we cannot build a mask; degrade to
+                    // clipping to the shape's reference box.
+                    return self.wr().define_clip_rect(spatial_id, clip.rect);
+                };
+
+                let data = shape_mask.rasterize(width, height, scale as f64);
+                let descriptor = webrender_api::ImageDescriptor {
+                    format: webrender_api::ImageFormat::RGBA8,
+                    size: webrender_api::units::DeviceIntSize::new(width as i32, height as i32),
+                    stride: Some((width * 4) as i32),
+                    offset: 0,
+                    flags: webrender_api::ImageDescriptorFlags::empty(),
+                };
+                self.paint_api.add_image(
+                    key,
+                    descriptor,
+                    paint_api::SerializableImageData::Raw(
+                        servo_base::generic_channel::GenericSharedMemory::from_vec(data),
+                    ),
+                    false,
+                );
+                self.shape_mask_cache.borrow_mut().insert(cache_key, key);
+                key
+            },
+        };
+
+        let image_mask = webrender_api::ImageMask {
+            image: image_key,
+            rect: clip.rect,
+        };
+        let points = shape_mask.hit_test_points(clip.rect);
+        self.wr().define_clip_image_mask(
+            spatial_id,
+            image_mask,
+            &points,
+            shape_mask.webrender_fill_rule(),
+        )
+    }
+
     /// Add a new clip to the WebRender display list being built. This only happens during
     /// WebRender display list building and these clips should be added after all clips
     /// from the `StackingContextTree` have already been processed.
@@ -423,6 +532,8 @@ impl DisplayListBuilder<'_> {
             rect,
             parent_scroll_node_id: state.spatial_id,
             parent_clip_id: state.clip_id,
+            #[cfg(feature = "ht_ai_gen")]
+            shape_mask: None,
         }))
     }
 

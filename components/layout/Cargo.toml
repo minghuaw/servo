@@ -17,6 +17,9 @@ doctest = false
 
 [features]
 tracing = ["dep:tracing"]
+# Agentic-experiment umbrella gate. When off, behavior is stock Servo (see
+# bundle/journal/2026-10-08-deferred-ai-gen-feature-flag.md).
+ht_ai_gen = []
 
 [dependencies]
 accesskit = { workspace = true }
