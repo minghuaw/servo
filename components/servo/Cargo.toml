@@ -56,7 +56,7 @@ gamepad = [
 ]
 # Agentic-experiment umbrella gate (see AGENTS.md / bundle/journal). Enables the
 # agentic feature implementations, e.g. rendering of `clip-path` polygons/paths.
-ht_ai_gen = ["layout/ht_ai_gen"]
+ht_ai_gen = ["layout/ht_ai_gen", "servo-config/ht_ai_gen"]
 jitspew = ["script/jitspew"]
 js_backtrace = ["script/js_backtrace"]
 js_jit = ["script/js_jit"]
