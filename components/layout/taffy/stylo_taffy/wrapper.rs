@@ -20,13 +20,17 @@ use super::{as_clamped_i16, convert, stylo};
 pub struct TaffyStyloStyle<T: Deref<Target = ComputedValues>> {
     pub style: T,
     pub is_compressible_replaced: bool,
+    /// Whether the containing block of this box (if any) is bidi-ltr. This is
+    /// used to resolve `self-start`/`self-end` alignments.
+    pub container_is_bidi_ltr: bool,
 }
 
 impl<T: Deref<Target = ComputedValues>> TaffyStyloStyle<T> {
-    pub fn new(style: T, is_compressible_replaced: bool) -> Self {
+    pub fn new(style: T, is_compressible_replaced: bool, container_is_bidi_ltr: bool) -> Self {
         Self {
             style,
             is_compressible_replaced,
+            container_is_bidi_ltr,
         }
     }
 }
@@ -445,6 +449,27 @@ impl<T: Deref<Target = ComputedValues>> taffy::GridItemStyle for TaffyStyloStyle
 
     #[inline]
     fn justify_self(&self) -> Option<taffy::AlignSelf> {
-        convert::item_alignment(self.style.get_position().justify_self.0)
+        let justify_self = self.style.get_position().justify_self.0;
+
+        #[cfg(feature = "ht_ai_gen")]
+        let justify_self = {
+            let matches_container =
+                self.style.writing_mode.is_bidi_ltr() == self.container_is_bidi_ltr;
+            // Resolve `self-start`/`self-end` against the box's own writing mode and
+            // `left`/`right` against the physical direction of the container, mirroring
+            // Gecko's grid implementation.
+            // <https://drafts.csswg.org/css-align/#valdef-self-position-self-start>
+            // <https://drafts.csswg.org/css-align/#valdef-justify-self-left>
+            let value = match justify_self.value() {
+                stylo::AlignFlags::SELF_START if !matches_container => stylo::AlignFlags::END,
+                stylo::AlignFlags::SELF_END if !matches_container => stylo::AlignFlags::START,
+                stylo::AlignFlags::LEFT if !self.container_is_bidi_ltr => stylo::AlignFlags::END,
+                stylo::AlignFlags::RIGHT if !self.container_is_bidi_ltr => stylo::AlignFlags::START,
+                _ => justify_self.value(),
+            };
+            justify_self.with_value(value)
+        };
+
+        convert::item_alignment(justify_self)
     }
 }
