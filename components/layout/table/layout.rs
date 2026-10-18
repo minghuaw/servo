@@ -64,6 +64,41 @@ enum CellContentAlignment {
     Baseline,
 }
 
+/// The block-size constraint that percentage insets of a relatively positioned table
+/// part resolve against. Browsers resolve those percentages against the *specified*
+/// block size of the parent table part (not its used size); when the parent's block
+/// size is not specified (indefinite), percentage insets behave as `auto`.
+#[cfg(feature = "ht_ai_gen")]
+fn specified_block_size_for_relative_positioning(style: &ComputedValues) -> SizeConstraint {
+    use style::values::generics::length::Size as GenericSize;
+    match &style.get_position().height {
+        GenericSize::LengthPercentage(length_percentage) => match length_percentage.0.to_length() {
+            Some(length) => SizeConstraint::Definite(Au::from(length)),
+            None => SizeConstraint::default(),
+        },
+        _ => SizeConstraint::default(),
+    }
+}
+
+/// Build the containing block used to resolve percentage insets of a relatively
+/// positioned table part. Only the block size differs from the layout containing
+/// block: it comes from the parent table part's specified block size.
+#[cfg(feature = "ht_ai_gen")]
+fn containing_block_for_relative_table_part<'a>(
+    containing_block: &ContainingBlock<'a>,
+    parent_style: Option<&ComputedValues>,
+) -> ContainingBlock<'a> {
+    ContainingBlock {
+        size: ContainingBlockSize {
+            inline: containing_block.size.inline,
+            block: parent_style
+                .map(specified_block_size_for_relative_positioning)
+                .unwrap_or_default(),
+        },
+        style: containing_block.style,
+    }
+}
+
 /// A result of a final or speculative layout of a single cell in
 /// the table. Note that this is only done for slots that are not
 /// covered by spans or empty.
@@ -2033,6 +2068,21 @@ impl<'a> TableLayout<'a> {
             cell.colspan,
         );
         row_relative_cell_rect.start_corner -= row_fragment_layout.rect.start_corner;
+
+        // A relatively positioned table cell is offset just like any other box. The offset
+        // must be applied to the cell's border-box rectangle (the cell contents are already
+        // positioned relative to it), and percentage insets resolve against the parent
+        // row's *specified* block size.
+        #[cfg(feature = "ht_ai_gen")]
+        if cell.context.base.style.clone_position() == Position::Relative {
+            let containing_block = containing_block_for_relative_table_part(
+                &row_fragment_layout.containing_block,
+                Some(&row_fragment_layout.row.base.style),
+            );
+            row_relative_cell_rect.start_corner +=
+                relative_adjustement(&cell.context.base.style, &containing_block);
+        }
+
         let mut fragment = cell.create_fragment(
             layout,
             row_relative_cell_rect,
@@ -2316,6 +2366,20 @@ impl<'a> RowFragmentLayout<'a> {
         containing_block_for_children: &ContainingBlock,
         row_group_fragment_layout: &mut Option<RowGroupFragmentLayout>,
     ) -> Fragment {
+        #[cfg(feature = "ht_ai_gen")]
+        if self.row.base.style.clone_position() == Position::Relative {
+            // The containing block for percentage insets is the row group's *specified*
+            // block size, which can differ from its used block size.
+            let parent_style = row_group_fragment_layout
+                .as_ref()
+                .map(|layout| layout.row_group.borrow().base.style.clone());
+            let containing_block = containing_block_for_relative_table_part(
+                containing_block_for_children,
+                parent_style.as_deref(),
+            );
+            self.rect.start_corner += relative_adjustement(&self.row.base.style, &containing_block);
+        }
+        #[cfg(not(feature = "ht_ai_gen"))]
         if self.row.base.style.clone_position() == Position::Relative {
             self.rect.start_corner +=
                 relative_adjustement(&self.row.base.style, containing_block_for_children);

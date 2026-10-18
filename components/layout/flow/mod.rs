@@ -1931,14 +1931,6 @@ impl<'container> PlacementState<'container> {
             _ => return,
         };
 
-        // From <https://drafts.csswg.org/css-align-3/#baseline-export>:
-        // > When finding the first/last baseline set of an inline-block, any baselines
-        // > contributed by table boxes must be skipped. (This quirk is a legacy behavior from
-        // > [CSS2].)
-        if self.is_inline_block_context && box_fragment.is_table_wrapper() {
-            return;
-        }
-
         let box_block_offset = box_fragment
             .content_rect()
             .origin
@@ -1946,11 +1938,42 @@ impl<'container> PlacementState<'container> {
             .block;
         let box_fragment_baselines =
             box_fragment.baselines(self.containing_block.style.writing_mode);
+
+        // From <https://drafts.csswg.org/css-align-3/#baseline-export>:
+        // > When finding the first/last baseline set of an inline-block, any baselines
+        // > contributed by table boxes must be skipped. (This quirk is a legacy behavior from
+        // > [CSS2].)
+        //
+        // Table baselines can reach the inline-block through intermediate block
+        // containers, so track whether each baseline originated from a table box instead
+        // of only checking the direct child.
+        let is_table_wrapper = box_fragment.is_table_wrapper();
+        let first_from_table = is_table_wrapper || box_fragment_baselines.first_from_table;
+        let last_from_table = is_table_wrapper || box_fragment_baselines.last_from_table;
+        let skip_first_table_baseline = self.is_inline_block_context &&
+            if cfg!(feature = "ht_ai_gen") {
+                first_from_table
+            } else {
+                is_table_wrapper
+            };
+        let skip_last_table_baseline = self.is_inline_block_context &&
+            if cfg!(feature = "ht_ai_gen") {
+                last_from_table
+            } else {
+                is_table_wrapper
+            };
+
         if let (None, Some(first)) = (self.inflow_baselines.first, box_fragment_baselines.first) {
-            self.inflow_baselines.first = Some(first + box_block_offset);
+            if !skip_first_table_baseline {
+                self.inflow_baselines.first = Some(first + box_block_offset);
+                self.inflow_baselines.first_from_table = first_from_table;
+            }
         }
         if let Some(last) = box_fragment_baselines.last {
-            self.inflow_baselines.last = Some(last + box_block_offset);
+            if !skip_last_table_baseline {
+                self.inflow_baselines.last = Some(last + box_block_offset);
+                self.inflow_baselines.last_from_table = last_from_table;
+            }
         }
     }
 
