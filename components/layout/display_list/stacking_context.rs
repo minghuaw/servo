@@ -573,6 +573,11 @@ impl BoxFragment {
             return Some(StackingContextType::StackingContext);
         }
 
+        #[cfg(feature = "ht_ai_gen")]
+        if super::mask::has_mask(&**style) {
+            return Some(StackingContextType::StackingContext);
+        }
+
         let box_style = &style.get_box();
         if box_style.position != ComputedPosition::Static {
             return Some(StackingContextType::StackingContainer);

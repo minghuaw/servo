@@ -208,6 +208,9 @@ pub struct LayoutThread {
     /// Cross-process access to the `Paint` API.
     paint_api: CrossProcessPaintApi,
 
+    /// Cache of generated R8 mask images, keyed by a hash of their inputs.
+    mask_image_cache: Arc<Mutex<HashMap<u64, webrender_api::ImageKey>>>,
+
     /// Debug options, copied from configuration to this `LayoutThread` in order
     /// to avoid having to constantly access the thread-safe global options.
     debug: DiagnosticsLogging,
@@ -855,6 +858,7 @@ impl LayoutThread {
             fragment_tree: Default::default(),
             stacking_context_tree: Default::default(),
             paint_api: config.paint_api,
+            mask_image_cache: Default::default(),
             stylist: Stylist::new(device, QuirksMode::NoQuirks),
             resolved_images_cache: Default::default(),
             debug: opts::get().debug.clone(),
@@ -1068,6 +1072,9 @@ impl LayoutThread {
             pending_svg_elements_for_serialization: Mutex::default(),
             animating_images: reflow_request.animating_images.clone(),
             animation_timeline_value: reflow_request.animation_timeline_value,
+            paint_api: Mutex::new(self.paint_api.clone()),
+            webview_id: self.webview_id,
+            mask_image_cache: self.mask_image_cache.clone(),
         });
         let mut reflow_statistics = Default::default();
 

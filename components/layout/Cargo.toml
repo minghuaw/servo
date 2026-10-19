@@ -17,6 +17,7 @@ doctest = false
 
 [features]
 tracing = ["dep:tracing"]
+ht_ai_gen = []
 
 [dependencies]
 accesskit = { workspace = true }

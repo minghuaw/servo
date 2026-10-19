@@ -16,10 +16,11 @@ use net_traits::image_cache::{
     Image as CachedImage, ImageCache, ImageCacheResult, ImageOrMetadataAvailable, PendingImageId,
 };
 use net_traits::request::InternalRequest;
+use paint_api::CrossProcessPaintApi;
 use parking_lot::{Mutex, RwLock};
 use pixels::RasterImage;
 use script::layout_dom::ServoLayoutNode;
-use servo_base::id::PainterId;
+use servo_base::id::{PainterId, WebViewId};
 use servo_url::{ImmutableOrigin, ServoUrl};
 use style::context::SharedStyleContext;
 use style::dom::OpaqueNode;
@@ -138,6 +139,15 @@ pub(crate) struct ImageResolver {
 
     /// The current animation timeline value used to properly initialize animating images.
     pub animation_timeline_value: f64,
+
+    /// Access to the `Paint` API, used to upload generated CSS mask images.
+    pub paint_api: Mutex<CrossProcessPaintApi>,
+
+    /// The webview that this layout belongs to. Needed to mint image keys.
+    pub webview_id: WebViewId,
+
+    /// Cache of generated R8 mask images, keyed by a hash of their inputs.
+    pub mask_image_cache: Arc<Mutex<HashMap<u64, ImageKey>>>,
 }
 
 impl Drop for ImageResolver {
