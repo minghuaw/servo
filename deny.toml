@@ -217,3 +217,7 @@ skip = [
     "phf_macros",
     "phf_shared",
 ]
+
+# Experiment forks used by the servo->stylo pin.
+[sources.allow-org]
+github = ["wwz529247756"]
