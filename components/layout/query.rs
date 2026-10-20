@@ -413,12 +413,30 @@ pub fn process_resolved_style_request(
                 .map(|fragment| fragment.padding)
                 .unwrap_or_default()
         });
+        let border = LazyCell::new(|| {
+            fragment
+                .retrieve_box_fragment()
+                .map(|fragment| fragment.border)
+                .unwrap_or_default()
+        });
         match longhand_id {
             LonghandId::Width if resolved_size_should_be_used_value(fragment) => {
-                content_rect.size.width
+                resolved_used_box_size(
+                    content_rect.size.width,
+                    &padding,
+                    &border,
+                    style,
+                    /* is_horizontal = */ true,
+                )
             },
             LonghandId::Height if resolved_size_should_be_used_value(fragment) => {
-                content_rect.size.height
+                resolved_used_box_size(
+                    content_rect.size.height,
+                    &padding,
+                    &border,
+                    style,
+                    /* is_horizontal = */ false,
+                )
             },
             LonghandId::MarginBottom => margins.bottom,
             LonghandId::MarginTop => margins.top,
@@ -453,6 +471,41 @@ fn resolved_size_should_be_used_value(fragment: &Fragment) -> bool {
         Fragment::Image(_) |
         Fragment::IFrame(_) => true,
         Fragment::Text(_) => false,
+    }
+}
+
+/// The resolved value of `width` / `height` is the used value. For an element
+/// with `box-sizing: border-box` the used value of these properties is the
+/// border-box size, so the used content-box size has to be expanded by the used
+/// padding and border.
+///
+/// <https://drafts.csswg.org/css-ui/#box-sizing>
+/// <https://drafts.csswg.org/cssom/#resolved-value-special-case-property-like-height>
+fn resolved_used_box_size(
+    content_size: Au,
+    padding: &crate::geom::PhysicalSides<Au>,
+    border: &crate::geom::PhysicalSides<Au>,
+    style: &ComputedValues,
+    is_horizontal: bool,
+) -> Au {
+    #[cfg(not(feature = "ht_ai_gen"))]
+    {
+        let _ = (padding, border, style, is_horizontal);
+        content_size
+    }
+    #[cfg(feature = "ht_ai_gen")]
+    {
+        if style.get_position().box_sizing != style::computed_values::box_sizing::T::BorderBox {
+            return content_size;
+        }
+        let padding_border = |sides: &crate::geom::PhysicalSides<Au>| {
+            if is_horizontal {
+                sides.left + sides.right
+            } else {
+                sides.top + sides.bottom
+            }
+        };
+        content_size + padding_border(padding) + padding_border(border)
     }
 }
 

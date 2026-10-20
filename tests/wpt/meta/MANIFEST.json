@@ -434937,6 +434937,34 @@
      }
     }
    },
+   "webgl": {
+    "blitFramebuffer-presents-drawing-buffer.html": [
+     "f699b4f089ef8a28543f348af1d0cb11af2af2d3",
+     [
+      null,
+      [
+       [
+        "/webgl/drawing-buffer-presented-ref.html",
+        "=="
+       ]
+      ],
+      {}
+     ]
+    ],
+    "clearBufferfv-presents-drawing-buffer.html": [
+     "f7db3726474daaf8c218d7326512fa0649c16d18",
+     [
+      null,
+      [
+       [
+        "/webgl/drawing-buffer-presented-ref.html",
+        "=="
+       ]
+      ],
+      {}
+     ]
+    ]
+   },
    "webvtt": {
     "rendering": {
      "cues-with-video": {
@@ -607591,6 +607619,10 @@
     ],
     "common.js": [
      "416c21ce9330d3f73576b6b5aa01dab06c5798ee",
+     []
+    ],
+    "drawing-buffer-presented-ref.html": [
+     "39c77d1742734113a833d4b91069363cce5e939f",
      []
     ]
    },
@@ -1437089,6 +1437121,13 @@
     ],
     "stencilMaskSeparate-front-and-back.html": [
      "8afb2f5da4653f9ec869248d836d12ba8826f339",
+     [
+      null,
+      {}
+     ]
+    ],
+    "texImage-half-float-type.html": [
+     "78930d896877774c93af2b2341191ce858aa182a",
      [
       null,
       {}
