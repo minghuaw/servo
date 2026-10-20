@@ -40,6 +40,16 @@ ignore = [
     # This is a dependency of `usvg`, `rustybuzz`, `fontdb`.
     # We will need to wait for upstream actions.
     "RUSTSEC-2026-0192",
+    # Advisories published after the `v0.7.0` base lock was cut; the versions are
+    # unchanged by this branch. `rustls` 0.23.45:
+    "RUSTSEC-2026-0346",
+    "RUSTSEC-2026-0347",
+    "RUSTSEC-2026-0348",
+    "RUSTSEC-2026-0349",
+    # `zbus_names`, `zvariant` and `zvariant_derive` are unmaintained.
+    "RUSTSEC-2026-0370",
+    "RUSTSEC-2026-0371",
+    "RUSTSEC-2026-0372",
 ]
 
 # This section is considered when running `cargo deny check licenses`
