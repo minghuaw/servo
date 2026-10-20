@@ -17,6 +17,8 @@ doctest = false
 
 [features]
 tracing = ["dep:tracing"]
+# Fork-only gate for CSS features implemented by this experiment.
+ht_ai_gen = []
 
 [dependencies]
 accesskit = { workspace = true }
