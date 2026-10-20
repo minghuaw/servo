@@ -37,6 +37,7 @@ kurbo = { workspace = true }
 layout_api = { workspace = true }
 log = { workspace = true }
 malloc_size_of = { workspace = true }
+mapped_hyph = { workspace = true }
 malloc_size_of_derive = { workspace = true }
 net_traits = { workspace = true }
 num-derive = { workspace = true }
