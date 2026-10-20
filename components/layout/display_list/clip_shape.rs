@@ -58,7 +58,7 @@ impl ClipShapeMask {
     ) -> Option<Self> {
         match shape {
             BasicShape::Polygon(polygon) => {
-                let contour = polygon
+                let points: Vec<Point> = polygon
                     .coordinates
                     .iter()
                     .map(|PolygonCoord(x, y)| {
@@ -68,8 +68,23 @@ impl ClipShapeMask {
                         )
                     })
                     .collect();
+                let radius = polygon
+                    .round
+                    .as_ref()
+                    .map(|round| {
+                        length_percentage_to_px(
+                            round,
+                            reference_size.width.min(reference_size.height),
+                        )
+                    })
+                    .unwrap_or(0.0);
+                let contours = if radius > 0.0 {
+                    flatten_commands(&rounded_polygon_commands(&points, radius))
+                } else {
+                    vec![points]
+                };
                 Some(Self {
-                    contours: vec![contour],
+                    contours,
                     fill_rule: polygon.fill,
                 })
             },
@@ -642,6 +657,89 @@ fn reflect(point: Point, control: Point) -> Point {
 }
 
 /// Flatten the absolute commands into a list of closed contours.
+/// Build path commands for a polygon whose vertices are rounded with `radius`.
+///
+/// Each corner is replaced by a circular arc tangent to both adjacent edges.
+/// As required by the specification, the radius is clamped so that a fillet
+/// never consumes more than half of either adjacent edge.
+///
+/// <https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-polygon>
+fn rounded_polygon_commands(points: &[Point], radius: f64) -> Vec<Cmd> {
+    let count = points.len();
+    if count < 3 || radius <= 0.0 {
+        return Vec::new();
+    }
+
+    let mut commands = Vec::with_capacity(count * 3 + 1);
+    let mut started = false;
+
+    for index in 0..count {
+        let previous = points[(index + count - 1) % count];
+        let current = points[index];
+        let next = points[(index + 1) % count];
+
+        let to_previous = (previous.0 - current.0, previous.1 - current.1);
+        let to_next = (next.0 - current.0, next.1 - current.1);
+        let previous_length =
+            (to_previous.0 * to_previous.0 + to_previous.1 * to_previous.1).sqrt();
+        let next_length = (to_next.0 * to_next.0 + to_next.1 * to_next.1).sqrt();
+
+        let mut start = current;
+        let mut end = current;
+        let mut sweep = false;
+        let mut fillet_radius = 0.0;
+
+        if previous_length > 0.0 && next_length > 0.0 {
+            let previous_direction = (
+                to_previous.0 / previous_length,
+                to_previous.1 / previous_length,
+            );
+            let next_direction = (to_next.0 / next_length, to_next.1 / next_length);
+            let cosine = (previous_direction.0 * next_direction.0 +
+                previous_direction.1 * next_direction.1)
+                .clamp(-1.0, 1.0);
+            let angle = cosine.acos();
+            if angle > 1e-6 && (PI - angle) > 1e-6 {
+                let half_angle_tangent = (angle / 2.0).tan();
+                let tangent = (radius / half_angle_tangent)
+                    .min(previous_length / 2.0)
+                    .min(next_length / 2.0);
+                fillet_radius = tangent * half_angle_tangent;
+                start = (
+                    current.0 + previous_direction.0 * tangent,
+                    current.1 + previous_direction.1 * tangent,
+                );
+                end = (
+                    current.0 + next_direction.0 * tangent,
+                    current.1 + next_direction.1 * tangent,
+                );
+                sweep = previous_direction.0 * next_direction.1 -
+                    previous_direction.1 * next_direction.0 <
+                    0.0;
+            }
+        }
+
+        if started {
+            commands.push(Cmd::Line(start));
+        } else {
+            commands.push(Cmd::Move(start));
+            started = true;
+        }
+        if fillet_radius > 0.0 {
+            commands.push(Cmd::Arc {
+                radii: (fillet_radius, fillet_radius),
+                rotation_deg: 0.0,
+                large_arc: false,
+                sweep,
+                to: end,
+            });
+        }
+    }
+
+    commands.push(Cmd::Close);
+    commands
+}
+
 fn flatten_commands(commands: &[Cmd]) -> Vec<Vec<Point>> {
     let mut contours: Vec<Vec<Point>> = Vec::new();
     let mut contour: Vec<Point> = Vec::new();
