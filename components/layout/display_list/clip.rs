@@ -99,6 +99,20 @@ impl StackingContextTreeClipStore {
             ClipPath::Shape(_, ShapeGeometryBox::ElementDependent) => ShapeBox::BorderBox,
             ClipPath::Box(ShapeGeometryBox::ShapeBox(shape_box)) => *shape_box,
             ClipPath::Box(ShapeGeometryBox::ElementDependent) => ShapeBox::BorderBox,
+            // There is no SVG object bounding box for an HTML box: `fill-box` resolves to the
+            // content box and `stroke-box`/`view-box` resolve to the border box.
+            #[cfg(feature = "ht_ai_gen")]
+            ClipPath::Shape(_, ShapeGeometryBox::FillBox) => ShapeBox::ContentBox,
+            #[cfg(feature = "ht_ai_gen")]
+            ClipPath::Box(ShapeGeometryBox::FillBox) => ShapeBox::ContentBox,
+            #[cfg(feature = "ht_ai_gen")]
+            ClipPath::Shape(_, ShapeGeometryBox::StrokeBox | ShapeGeometryBox::ViewBox) => {
+                ShapeBox::BorderBox
+            },
+            #[cfg(feature = "ht_ai_gen")]
+            ClipPath::Box(ShapeGeometryBox::StrokeBox | ShapeGeometryBox::ViewBox) => {
+                ShapeBox::BorderBox
+            },
             _ => return None,
         };
         let fragment_builder = BuilderForBoxFragment::new(box_fragment, containing_block_origin);
