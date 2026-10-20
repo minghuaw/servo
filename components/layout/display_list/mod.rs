@@ -1086,7 +1086,16 @@ impl Fragment {
         }
 
         let parent_style = fragment.style();
-        let color = parent_style.clone_color();
+        let mut color = parent_style.clone_color();
+        if fragment
+            .base
+            .flags
+            .contains(FragmentFlags::IS_CHECKBOX_BEFORE)
+        {
+            if let ColorOrAuto::Color(accent) = parent_style.clone_accent_color() {
+                color = accent.resolve_to_absolute(&color);
+            }
+        }
         let font_size = parent_style.clone_font_size();
         let font_metrics = &fragment.font_metrics;
         let dppx = builder.device_pixel_ratio.get();
@@ -1671,7 +1680,22 @@ impl<'a> BuilderForBoxFragment<'a> {
         painter: &BackgroundPainter,
     ) {
         let b = painter.style.get_background();
-        let background_color = painter.style.resolve_color(&b.background_color);
+        let background_color = if self
+            .fragment
+            .base
+            .flags
+            .contains(FragmentFlags::IS_RADIO_AFTER)
+        {
+            let current_color = match painter.style.clone_accent_color() {
+                ColorOrAuto::Color(accent) => {
+                    accent.resolve_to_absolute(&painter.style.clone_color())
+                },
+                ColorOrAuto::Auto => AbsoluteColor::BLACK,
+            };
+            b.background_color.resolve_to_absolute(&current_color)
+        } else {
+            painter.style.resolve_color(&b.background_color)
+        };
         if background_color.alpha > 0.0 {
             // https://drafts.csswg.org/css-backgrounds/#background-color
             // “The background color is clipped according to the background-clip
@@ -2220,9 +2244,20 @@ impl<'a> BuilderForBoxFragment<'a> {
             OutlineStyle::Auto => BorderStyle::Solid,
             OutlineStyle::BorderStyle(s) => s,
         };
+        let current_color = style.clone_color();
+        let outline_color = match &outline.outline_color.0 {
+            ColorOrAuto::Auto if outline.outline_style.is_auto() => {
+                match style.clone_accent_color() {
+                    ColorOrAuto::Color(accent) => accent.resolve_to_absolute(&current_color),
+                    ColorOrAuto::Auto => current_color,
+                }
+            },
+            ColorOrAuto::Auto => current_color,
+            ColorOrAuto::Color(color) => color.resolve_to_absolute(&current_color),
+        };
         let side = self.build_border_side(BorderStyleColor {
             style: border_style,
-            color: style.resolve_color(&outline.outline_color),
+            color: outline_color,
         });
         let details = wr::BorderDetails::Normal(wr::NormalBorder {
             top: side,
