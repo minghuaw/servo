@@ -469,7 +469,7 @@ impl DisplayListBuilder<'_> {
                 let has_effective_mask = {
                     #[cfg(feature = "ht_ai_gen")]
                     {
-                        mask::has_mask(&**style)
+                        mask::has_mask(&style)
                     }
                     #[cfg(not(feature = "ht_ai_gen"))]
                     {

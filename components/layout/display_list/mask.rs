@@ -35,6 +35,9 @@ use webrender_api::{
 use super::{BuilderForBoxFragment, DisplayListBuilder};
 use crate::context::{ImageResolver, ResolvedImage};
 
+/// An sRGB `(r, g, b, a)` color with components in the `0..=1` range.
+type MaskColor = (f32, f32, f32, f32);
+
 /// Returns whether the given style has any effective mask image.
 pub(super) fn has_mask(style: &ComputedValues) -> bool {
     style
@@ -128,16 +131,14 @@ pub(super) fn create_mask_clip(
         });
     }
 
-    let Some(pixels) = rasterize(
+    let pixels = rasterize(
         &layers,
         surface_rect,
         width as usize,
         height as usize,
         device_pixel_ratio,
         style,
-    ) else {
-        return None;
-    };
+    )?;
 
     let mut hasher = DefaultHasher::new();
     width.hash(&mut hasher);
@@ -195,17 +196,17 @@ fn get_cyclic<T>(values: &[T], index: usize) -> &T {
 
 #[derive(Clone, Copy)]
 enum MaskBox {
-    ContentBox,
-    PaddingBox,
-    BorderBox,
+    Content,
+    Padding,
+    Border,
 }
 
 impl From<MaskOrigin> for MaskBox {
     fn from(origin: MaskOrigin) -> Self {
         match origin {
-            MaskOrigin::ContentBox => MaskBox::ContentBox,
-            MaskOrigin::PaddingBox => MaskBox::PaddingBox,
-            MaskOrigin::BorderBox => MaskBox::BorderBox,
+            MaskOrigin::ContentBox => MaskBox::Content,
+            MaskOrigin::PaddingBox => MaskBox::Padding,
+            MaskOrigin::BorderBox => MaskBox::Border,
         }
     }
 }
@@ -213,18 +214,18 @@ impl From<MaskOrigin> for MaskBox {
 impl From<BackgroundClip> for MaskBox {
     fn from(clip: BackgroundClip) -> Self {
         match clip {
-            BackgroundClip::ContentBox => MaskBox::ContentBox,
-            BackgroundClip::PaddingBox => MaskBox::PaddingBox,
-            BackgroundClip::BorderBox | BackgroundClip::BorderArea => MaskBox::BorderBox,
+            BackgroundClip::ContentBox => MaskBox::Content,
+            BackgroundClip::PaddingBox => MaskBox::Padding,
+            BackgroundClip::BorderBox | BackgroundClip::BorderArea => MaskBox::Border,
         }
     }
 }
 
 fn box_rect(fragment_builder: &BuilderForBoxFragment<'_>, mask_box: MaskBox) -> LayoutRect {
     match mask_box {
-        MaskBox::ContentBox => *fragment_builder.content_rect(),
-        MaskBox::PaddingBox => *fragment_builder.padding_rect(),
-        MaskBox::BorderBox => fragment_builder.border_rect,
+        MaskBox::Content => *fragment_builder.content_rect(),
+        MaskBox::Padding => *fragment_builder.padding_rect(),
+        MaskBox::Border => fragment_builder.border_rect,
     }
 }
 
@@ -514,7 +515,7 @@ fn layer_coverage(
     }
 }
 
-fn sample_image(raster: &RasterImage, u: f32, v: f32) -> Option<(f32, f32, f32, f32)> {
+fn sample_image(raster: &RasterImage, u: f32, v: f32) -> Option<MaskColor> {
     let width = raster.metadata.width as usize;
     let height = raster.metadata.height as usize;
     if width == 0 || height == 0 {
@@ -565,7 +566,7 @@ fn gradient_color(
     y: f32,
     size: (f32, f32),
     style: &ComputedValues,
-) -> Option<(f32, f32, f32, f32)> {
+) -> Option<MaskColor> {
     let Gradient::Linear {
         items,
         direction,
@@ -664,8 +665,8 @@ fn linear_color_stops(
     style: &ComputedValues,
     items: &[GradientItem<Color, LengthPercentage>],
     line_length: f32,
-) -> Vec<(f32, (f32, f32, f32, f32))> {
-    let mut stops: Vec<(Option<f32>, (f32, f32, f32, f32))> = items
+) -> Vec<(f32, MaskColor)> {
+    let mut stops: Vec<(Option<f32>, MaskColor)> = items
         .iter()
         .filter_map(|item| match item {
             GradientItem::SimpleColorStop(color) => Some((None, resolved_color(style, color))),
@@ -732,7 +733,7 @@ fn linear_color_stops(
         .collect()
 }
 
-fn resolved_color(style: &ComputedValues, color: &Color) -> (f32, f32, f32, f32) {
+fn resolved_color(style: &ComputedValues, color: &Color) -> MaskColor {
     let color = style.resolve_color(color).to_color_space(ColorSpace::Srgb);
     (
         color.components.0.clamp(0.0, 1.0),

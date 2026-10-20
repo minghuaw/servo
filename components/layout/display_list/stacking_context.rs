@@ -574,7 +574,7 @@ impl BoxFragment {
         }
 
         #[cfg(feature = "ht_ai_gen")]
-        if super::mask::has_mask(&**style) {
+        if super::mask::has_mask(&style) {
             return Some(StackingContextType::StackingContext);
         }
 
