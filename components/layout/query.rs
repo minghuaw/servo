@@ -613,6 +613,7 @@ fn offset_parent_fragments(node: ServoLayoutNode<'_>) -> Option<OffsetParentFrag
     ) {
         return None;
     }
+    let element_is_table_cell = flags.contains(FragmentFlags::IS_TABLE_TH_OR_TD_ELEMENT);
 
     if fragment
         .retrieve_box_fragment()
@@ -620,6 +621,13 @@ fn offset_parent_fragments(node: ServoLayoutNode<'_>) -> Option<OffsetParentFrag
     {
         return None;
     }
+
+    // The `td`/`th`/`table` offset-parent exception below only applies when the element
+    // itself is statically positioned. Sticky or relatively positioned table parts use
+    // the normal nearest-positioned-ancestor rule.
+    let element_is_static = fragment.retrieve_box_fragment().map_or(true, |fragment| {
+        fragment.style().get_box().position == Position::Static
+    });
 
     // 2.  Return the nearest ancestor element of the element for which at least one of
     //     the following is true and terminate this algorithm if such an ancestor is found:
@@ -647,10 +655,15 @@ fn offset_parent_fragments(node: ServoLayoutNode<'_>) -> Option<OffsetParentFrag
             }
 
             let flags = parent_fragment.base.flags;
-            if flags.intersects(
-                FragmentFlags::IS_BODY_ELEMENT_OF_HTML_ELEMENT_ROOT |
-                    FragmentFlags::IS_TABLE_TH_OR_TD_ELEMENT,
-            ) {
+            // Only sticky/relative *table cells* need the normal nearest-positioned-ancestor
+            // rule; other table parts keep the legacy exception to avoid changing the paint
+            // order of their position indicators.
+            let table_exception_applies =
+                !cfg!(feature = "ht_ai_gen") || element_is_static || !element_is_table_cell;
+            if flags.contains(FragmentFlags::IS_BODY_ELEMENT_OF_HTML_ELEMENT_ROOT) ||
+                (table_exception_applies &&
+                    flags.contains(FragmentFlags::IS_TABLE_TH_OR_TD_ELEMENT))
+            {
                 return Some(OffsetParentFragments {
                     parent: parent_fragment.clone(),
                     grandparent: grandparent_fragment,

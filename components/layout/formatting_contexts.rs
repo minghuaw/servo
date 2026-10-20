@@ -88,6 +88,11 @@ impl IndependentFormattingContextContents {
 pub(crate) struct Baselines {
     pub first: Option<Au>,
     pub last: Option<Au>,
+    /// Whether the first baseline was contributed by a table box. Such baselines must be
+    /// skipped when finding the baselines of an inline-block.
+    pub first_from_table: bool,
+    /// Whether the last baseline was contributed by a table box.
+    pub last_from_table: bool,
 }
 
 impl Baselines {
@@ -95,6 +100,7 @@ impl Baselines {
         Self {
             first: self.first.map(|first| first + block_offset),
             last: self.last.map(|last| last + block_offset),
+            ..*self
         }
     }
 }

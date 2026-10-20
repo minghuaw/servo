@@ -536,6 +536,7 @@ impl TaffyContainer {
                             last: child.taffy_baselines.last.map(|baseline| {
                                 Au::from_f32_px(baseline) - padding.top - border.top
                             }),
+                            ..Default::default()
                         });
 
                         child.positioning_context.layout_collected_children(
@@ -607,6 +608,7 @@ impl TaffyContainer {
                 last: output.baselines.last.map(|baseline| {
                     Au::from_f32_px(baseline) - pbm.padding.block_start - pbm.border.block_start
                 }),
+                ..Default::default()
             },
 
             // TODO: determine this accurately

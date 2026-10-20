@@ -231,7 +231,8 @@ impl BoxFragment {
             let margin = self.margin.to_logical(writing_mode);
             baselines.last = Some(
                 content_rect_size.block + padding.block_end + border.block_end + margin.block_end,
-            )
+            );
+            baselines.last_from_table = false;
         }
         baselines
     }

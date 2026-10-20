@@ -938,6 +938,7 @@ impl FlexContainer {
             last: baseline_alignment_participating_baselines
                 .last
                 .or(all_baselines.last),
+            ..Default::default()
         };
 
         // TODO: `depends_on_block_constraints` could be false in some corner cases
