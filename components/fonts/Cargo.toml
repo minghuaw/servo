@@ -21,6 +21,8 @@ doctest = false
 # suitable freetype version, the build will fail!
 # Only affects targets where freetype-sys is a dependency (Linux/Android/OHOS)
 bundled_freetype = ["freetype-sys/bundled"]
+# Fork-only gate for CSS features implemented by this experiment.
+ht_ai_gen = []
 tracing = ["dep:tracing"]
 
 [dependencies]

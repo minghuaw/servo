@@ -33,6 +33,7 @@ pub struct FontDescriptor {
     /// This does not include synthesized variations from `font-style`, `font-stretch` etc.
     pub variation_settings: Vec<FontVariation>,
     pub synthesis_weight: FontSynthesis,
+    pub synthesis_small_caps: FontSynthesis,
     pub optical_sizing: FontOpticalSizing,
 }
 
@@ -57,6 +58,7 @@ impl<'a> From<&'a FontStyleStruct> for FontDescriptor {
             pt_size: Au::from_f32_px(style.font_size.computed_size().px()),
             variation_settings,
             synthesis_weight: style.clone_font_synthesis_weight(),
+            synthesis_small_caps: style.clone_font_synthesis_small_caps(),
             optical_sizing: style.clone_font_optical_sizing(),
         }
     }
