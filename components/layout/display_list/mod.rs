@@ -1079,6 +1079,34 @@ impl PaintTraversalHandler for DisplayListBuilder<'_> {
             .union(&self.fragment_tree.scrollable_overflow())
             .to_webrender();
 
+        // The synthetic root stacking context has no clip of its own; the root
+        // element's clips (for example a `clip-path` on the document element) are
+        // stored on its fragment. Clipping the document element also clips the
+        // propagated canvas background, so apply them here as well.
+        //
+        // WebRender's quad fast path does not support image-mask clips on
+        // rectangle primitives (it asserts), so paint the background inside a
+        // picture that carries the clip instead of clipping the rectangle.
+        let canvas_clip_id = fragment
+            .generated_clip_id()
+            .filter(|clip_id| *clip_id != state.clip_id);
+        if let Some(clip_id) = canvas_clip_id {
+            let spatial_id = self.spatial_id(state.spatial_id);
+            let clip_chain_id = self.clip_chain_id(clip_id);
+            self.wr().push_stacking_context(
+                spatial_id,
+                PrimitiveFlags::default(),
+                Some(clip_chain_id),
+                webrender_api::TransformStyle::Flat,
+                webrender_api::MixBlendMode::Normal,
+                &[],
+                &[],
+                wr::RasterSpace::Screen,
+                wr::StackingContextFlags::empty(),
+                None,
+            );
+        }
+
         let background_color =
             source_style.resolve_color(&source_style.get_background().background_color);
         if background_color.alpha > 0.0 {
@@ -1104,6 +1132,10 @@ impl PaintTraversalHandler for DisplayListBuilder<'_> {
             positioning_area_override: None,
         };
         fragment_builder.build_background_image(self, state, &painter);
+
+        if canvas_clip_id.is_some() {
+            self.wr().pop_stacking_context();
+        }
     }
 
     fn visit_box_for_outline(&mut self, state: &TraversalState, fragment: &Arc<BoxFragment>) {
