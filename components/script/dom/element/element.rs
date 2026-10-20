@@ -47,6 +47,7 @@ use style::applicable_declarations::ApplicableDeclarationBlock;
 use style::attr::{AttrValue, LengthOrPercentageOrAuto};
 use style::context::QuirksMode;
 use style::invalidation::element::restyle_hints::RestyleHint;
+use style::properties::longhands::scroll_behavior::computed_value::T as ComputedScrollBehavior;
 use style::properties::longhands::{
     self, background_image, border_spacing, color, font_family, font_size,
 };
@@ -1113,6 +1114,24 @@ impl Element {
                 .primary()
                 .get_ui()
                 .user_select,
+        )
+    }
+
+    /// Returns the computed value of the [`scroll-behavior`] property. Returns `None` if the
+    /// element is unstyled.
+    ///
+    /// [`scroll-behavior`]: <https://drafts.csswg.org/cssom-view/#propdef-scroll-behavior>
+    pub(crate) fn computed_scroll_behavior(&self) -> Option<ComputedScrollBehavior> {
+        Some(
+            self.style_data
+                .borrow()
+                .as_ref()?
+                .element_data
+                .borrow()
+                .styles
+                .primary()
+                .get_box()
+                .clone_scroll_behavior(),
         )
     }
 

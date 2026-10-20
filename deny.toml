@@ -217,3 +217,11 @@ skip = [
     "phf_macros",
     "phf_shared",
 ]
+
+# github.com organizations to allow git sources for
+[sources.allow-org]
+github = [
+    # Fork used by the local completeness experiment (scroll-behavior stylo un-gate).
+    # Upstream uses "servo" (servo/stylo); restore that when the change lands.
+    "minghuaw",
+]

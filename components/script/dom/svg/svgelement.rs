@@ -219,7 +219,7 @@ impl SVGElementMethods<crate::DomTypeHolder> for SVGElement {
             };
             self.upcast::<Element>().scroll_into_view_with_options(
                 cx,
-                ScrollBehavior::Smooth,
+                ScrollBehavior::Auto,
                 scroll_axis,
                 scroll_axis,
                 None,

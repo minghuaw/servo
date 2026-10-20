@@ -1187,6 +1187,10 @@ impl ScriptThread {
                 // > global object as the timestamp [WEBANIMATIONS]
                 document.update_animations_and_send_events(cx);
 
+                // Advance any ongoing smooth scrolls (the per-frame driver, analogous to
+                // Gecko's refresh-driver-driven scroll animation).
+                document.window().advance_smooth_scrolls(cx);
+
                 // TODO(#31866): Implement "run the fullscreen steps" from
                 // https://fullscreen.spec.whatwg.org/multipage/#run-the-fullscreen-steps.
 
