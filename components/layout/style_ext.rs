@@ -708,7 +708,8 @@ impl ComputedValuesExt for ComputedValues {
             !effects.clip.is_auto() ||
             self.get_svg().clip_path != ClipPath::None ||
             self.get_box().isolation == ComputedIsolation::Isolate ||
-            effects.mix_blend_mode != ComputedMixBlendMode::Normal
+            effects.mix_blend_mode != ComputedMixBlendMode::Normal ||
+            has_mask_image(self)
         {
             return ComputedTransformStyle::Flat;
         }
@@ -1384,4 +1385,20 @@ impl TransformExt for LayoutTransform {
         let post_translation = Self::translation(-x, -y, -z);
         post_translation.then(self).then(&pre_translation)
     }
+}
+
+/// Whether the given style has a mask image (a grouping property value).
+#[cfg(feature = "ht_ai_gen")]
+fn has_mask_image(style: &ComputedValues) -> bool {
+    style
+        .get_svg()
+        .mask_image
+        .0
+        .iter()
+        .any(|image| !matches!(image, style::values::computed::Image::None))
+}
+
+#[cfg(not(feature = "ht_ai_gen"))]
+fn has_mask_image(_style: &ComputedValues) -> bool {
+    false
 }

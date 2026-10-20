@@ -76,6 +76,8 @@ mod clip;
 mod conversions;
 mod gradient;
 mod hit_test;
+#[cfg(feature = "ht_ai_gen")]
+mod mask;
 mod paint_timing_handler;
 mod paint_traversal;
 mod stacking_context;
@@ -464,9 +466,21 @@ impl DisplayListBuilder<'_> {
                 // instead of the root stacking context?
                 is_blend_container &= !fragment.base.flags.contains(FragmentFlags::IS_ROOT_ELEMENT);
 
+                let has_effective_mask = {
+                    #[cfg(feature = "ht_ai_gen")]
+                    {
+                        mask::has_mask(&style)
+                    }
+                    #[cfg(not(feature = "ht_ai_gen"))]
+                    {
+                        false
+                    }
+                };
+
                 // WebRender only uses the stacking context to apply certain effects. If we don't
                 // actually need to create a stacking context, just avoid creating one.
                 if !is_blend_container &&
+                    !has_effective_mask &&
                     effects.filter.0.is_empty() &&
                     effects.opacity == 1.0 &&
                     effects.mix_blend_mode == ComputedMixBlendMode::Normal &&
@@ -517,6 +531,11 @@ impl DisplayListBuilder<'_> {
         };
         let spatial_id = self.spatial_id(stacking_context.scroll_tree_node_id);
 
+        #[cfg(feature = "ht_ai_gen")]
+        let clip_chain_id = self
+            .create_mask_clip_chain(stacking_context, spatial_id, clip_chain_id)
+            .or(clip_chain_id);
+
         self.wr().push_stacking_context(
             spatial_id,
             primitive_flags,
@@ -531,6 +550,22 @@ impl DisplayListBuilder<'_> {
         );
 
         true
+    }
+
+    /// Create an image-mask clip for the mask layers of `stacking_context` and chain it
+    /// on top of `parent_clip_chain_id`.
+    #[cfg(feature = "ht_ai_gen")]
+    fn create_mask_clip_chain(
+        &mut self,
+        stacking_context: &StackingContext,
+        spatial_id: SpatialId,
+        parent_clip_chain_id: Option<ClipChainId>,
+    ) -> Option<ClipChainId> {
+        let fragment = stacking_context.fragment()?;
+        let with_style = fragment.with_style();
+        let fragment_builder =
+            BuilderForBoxFragment::new(&with_style, stacking_context.containing_block_origin);
+        mask::create_mask_clip(self, &fragment_builder, spatial_id, parent_clip_chain_id)
     }
 
     fn common_properties(
