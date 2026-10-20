@@ -36,7 +36,7 @@ jobs:
         run: |
           {
             echo 'result<<EOF'
-            python ./python/servo/try_parser.py ${{ github.event_name == 'pull_request' && 'linux-unit-tests lint' || github.event_name == 'push' && 'full macos-arm-capi bencher production-bencher coverage' || 'fail-fast full' }}
+            python ./python/servo/try_parser.py ${{ github.event_name == 'pull_request' && 'linux-unit-tests linux-wpt lint' || github.event_name == 'push' && 'full macos-arm-capi bencher production-bencher coverage' || 'fail-fast full' }}
             echo EOF
            } >> $GITHUB_OUTPUT
 
@@ -63,6 +63,36 @@ jobs:
       bencher: ${{ matrix.bencher }}
       coverage: ${{ matrix.coverage }}
       capi: ${{ matrix.capi }}
+
+  wpt-gate:
+    name: WPT Gate
+    needs: [decision, build]
+    if: always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require a successful full WPT run
+        env:
+          CONFIG: ${{ needs.decision.outputs.configuration }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          if os.environ.get("BUILD_RESULT") != "success":
+              sys.exit(f"build result: {os.environ.get('BUILD_RESULT')}")
+
+          try:
+              config = json.loads(os.environ.get("CONFIG", ""))
+          except json.JSONDecodeError as error:
+              sys.exit(f"invalid try configuration: {error}")
+
+          if not any(job.get("wpt") for job in config.get("matrix", [])):
+              sys.exit("PR configuration does not include WPT")
+
+          print("full WPT build succeeded")
+          PY
 
   build-result:
     name: Result
