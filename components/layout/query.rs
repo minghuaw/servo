@@ -24,6 +24,7 @@ use servo_arc::Arc as ServoArc;
 use servo_base::text::Utf32CodeUnits;
 use servo_geometry::{FastLayoutTransform, au_rect_to_f32_rect, f32_rect_to_au_rect};
 use servo_url::ServoUrl;
+use style::Atom;
 use style::computed_values::display::T as Display;
 use style::computed_values::position::T as Position;
 use style::computed_values::visibility::T as Visibility;
@@ -478,14 +479,16 @@ fn resolve_grid_template(
     style: &ComputedValues,
     longhand_id: LonghandId,
 ) -> Option<String> {
-    let (track_info, computed_value) = match longhand_id {
+    let (track_info, computed_value, is_columns) = match longhand_id {
         LonghandId::GridTemplateRows => (
             &grid_info.info.rows,
             &style.get_position().grid_template_rows,
+            false,
         ),
         LonghandId::GridTemplateColumns => (
             &grid_info.info.columns,
             &style.get_position().grid_template_columns,
+            true,
         ),
         _ => return None,
     };
@@ -497,7 +500,22 @@ fn resolve_grid_template(
         GenericGridTemplateComponent::None |
         GenericGridTemplateComponent::TrackList(_) |
         GenericGridTemplateComponent::Masonry => {
-            (!track_info.positions.is_empty()).then(|| track_info.to_track_list_string())
+            if track_info.positions.is_empty() {
+                return None;
+            }
+            #[cfg(feature = "ht_ai_gen")]
+            {
+                // Taffy's size estimate may create trailing implicit tracks that no
+                // item actually occupies. Include every track up to the explicit grid
+                // end and the last item edge, and drop the rest.
+                let keep_track_count =
+                    resolved_track_count(track_info, &grid_info.info.items, is_columns);
+                Some(serialize_resolved_track_list(track_info, keep_track_count))
+            }
+            #[cfg(not(feature = "ht_ai_gen"))]
+            {
+                Some(track_info.to_track_list_string())
+            }
         },
 
         // <https://drafts.csswg.org/css-grid/#resolved-track-list-subgrid>
@@ -509,6 +527,77 @@ fn resolve_grid_template(
         // TODO: implement subgrid
         GenericGridTemplateComponent::Subgrid(_) => None,
     }
+}
+
+#[cfg(feature = "ht_ai_gen")]
+fn resolved_track_count(
+    track_info: &taffy::DetailedGridTracksInfo<Atom>,
+    items: &[taffy::DetailedGridItemsInfo],
+    is_columns: bool,
+) -> usize {
+    let explicit_end = track_info
+        .negative_implicit_tracks
+        .saturating_add(track_info.explicit_tracks) as usize;
+    let used_end = items
+        .iter()
+        .map(|item| {
+            let end_line = if is_columns {
+                item.column_end
+            } else {
+                item.row_end
+            };
+            (end_line as usize).saturating_sub(1)
+        })
+        .max()
+        .unwrap_or(0);
+    explicit_end.max(used_end)
+}
+
+#[cfg(feature = "ht_ai_gen")]
+fn serialize_resolved_track_list(
+    track_info: &taffy::DetailedGridTracksInfo<Atom>,
+    keep_track_count: usize,
+) -> String {
+    fn write_line_names(out: &mut String, names: &[Atom]) {
+        out.push('[');
+        for (i, name) in names.iter().enumerate() {
+            if i != 0 {
+                out.push(' ');
+            }
+            out.push_str(name.as_ref());
+        }
+        out.push(']');
+    }
+
+    let keep_track_count = keep_track_count.min(track_info.positions.len());
+    let mut out = String::new();
+    let mut needs_space = false;
+    for (track_index, position) in track_info
+        .positions
+        .iter()
+        .take(keep_track_count)
+        .enumerate()
+    {
+        let names = track_info.names_for_line(track_index);
+        if !names.is_empty() {
+            if needs_space {
+                out.push(' ');
+            }
+            write_line_names(&mut out, names);
+            needs_space = true;
+        }
+        if needs_space {
+            out.push(' ');
+        }
+        out.push_str(&format!("{}px", position.end - position.start));
+        needs_space = true;
+    }
+    let trailing_names = track_info.names_for_line(keep_track_count);
+    if !trailing_names.is_empty() {
+        out.push(' ');
+        write_line_names(&mut out, trailing_names);
+    }
+    out
 }
 
 #[expect(unsafe_code)]

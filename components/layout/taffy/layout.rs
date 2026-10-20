@@ -442,7 +442,33 @@ impl TaffyContainer {
             },
             known_dimensions,
             parent_size: taffy_containing_block,
-            available_space: taffy_containing_block.map(AvailableSpace::from),
+            // An auto-height grid is not constrained by the block size of its
+            // containing block: its rows size to max-content (and then grow to
+            // their growth limits). Passing the parent's definite height here
+            // would wrongly clamp `minmax()` tracks to their minimum.
+            available_space: {
+                #[cfg(feature = "ht_ai_gen")]
+                {
+                    taffy::Size {
+                        width: taffy_containing_block
+                            .width
+                            .map(AvailableSpace::Definite)
+                            .unwrap_or(AvailableSpace::MaxContent),
+                        height: if known_dimensions.height.is_some() {
+                            taffy_containing_block
+                                .height
+                                .map(AvailableSpace::Definite)
+                                .unwrap_or(AvailableSpace::MaxContent)
+                        } else {
+                            AvailableSpace::MaxContent
+                        },
+                    }
+                }
+                #[cfg(not(feature = "ht_ai_gen"))]
+                {
+                    taffy_containing_block.map(AvailableSpace::from)
+                }
+            },
         };
 
         let output = match container_ctx.style.clone_display().inside() {
