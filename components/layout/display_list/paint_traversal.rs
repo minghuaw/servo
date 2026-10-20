@@ -592,6 +592,7 @@ impl TraversalState {
                         .resolve_to_absolute(color),
                     style: style.clone_text_decoration_style(),
                     thickness: style.clone_text_decoration_thickness(),
+                    underline_offset: style.get_inherited_text().text_underline_offset.clone(),
                 });
                 Rc::new(new_vector)
             },
