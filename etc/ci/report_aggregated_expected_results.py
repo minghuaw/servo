@@ -43,7 +43,7 @@ class Item:
         else:
             title = f"{actual} {title}"
 
-        issue_url = "http://github.com/servo/servo/issues/"
+        issue_url = "https://redirect.github.com/servo/servo/issues/"
         if "issues" in result and result["issues"]:
             issues = ", ".join([f"[#{issue}]({issue_url}{issue})" for issue in result["issues"]])
             title += f" ({issues})"
