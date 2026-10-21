@@ -217,3 +217,8 @@ skip = [
     "phf_macros",
     "phf_shared",
 ]
+
+[sources]
+allow-git = [
+    "https://github.com/mu-mostafa98/stylo",
+]
