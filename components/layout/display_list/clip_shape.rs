@@ -221,8 +221,8 @@ impl ClipShapeMask {
             }
 
             let row_start = (row as usize) * (width as usize) * 4;
-            for x in 0..width as usize {
-                let alpha = (coverage[x] * 255.0 + 0.5).clamp(0.0, 255.0) as u8;
+            for (x, coverage) in coverage.iter().enumerate() {
+                let alpha = (coverage * 255.0 + 0.5).clamp(0.0, 255.0) as u8;
                 let offset = row_start + x * 4;
                 data[offset] = alpha;
                 data[offset + 1] = alpha;
@@ -246,11 +246,11 @@ fn add_span(coverage: &mut [f64], x0: f64, x1: f64, weight: f64) {
     }
     let first = x0.floor() as usize;
     let last = (x1.ceil() as usize).min(coverage.len());
-    for pixel in first..last {
+    for (pixel, coverage) in coverage.iter_mut().enumerate().take(last).skip(first) {
         let left = (pixel as f64).max(x0);
         let right = ((pixel + 1) as f64).min(x1);
         if right > left {
-            coverage[pixel] += (right - left) * weight;
+            *coverage += (right - left) * weight;
         }
     }
 }
