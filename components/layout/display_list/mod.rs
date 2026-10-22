@@ -1087,9 +1087,11 @@ impl PaintTraversalHandler for DisplayListBuilder<'_> {
         // WebRender's quad fast path does not support image-mask clips on
         // rectangle primitives (it asserts), so paint the background inside a
         // picture that carries the clip instead of clipping the rectangle.
+        #[cfg(feature = "ht_ai_gen")]
         let canvas_clip_id = fragment
             .generated_clip_id()
             .filter(|clip_id| *clip_id != state.clip_id);
+        #[cfg(feature = "ht_ai_gen")]
         if let Some(clip_id) = canvas_clip_id {
             let spatial_id = self.spatial_id(state.spatial_id);
             let clip_chain_id = self.clip_chain_id(clip_id);
@@ -1133,6 +1135,7 @@ impl PaintTraversalHandler for DisplayListBuilder<'_> {
         };
         fragment_builder.build_background_image(self, state, &painter);
 
+        #[cfg(feature = "ht_ai_gen")]
         if canvas_clip_id.is_some() {
             self.wr().pop_stacking_context();
         }
