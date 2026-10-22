@@ -54,8 +54,7 @@ gamepad = [
     "servo-constellation/gamepad",
     "embedder_traits/gamepad",
 ]
-# Agentic-experiment umbrella gate (see AGENTS.md / bundle/journal). Enables the
-# agentic feature implementations, e.g. rendering of `clip-path` polygons/paths.
+# Fork-only gate for CSS features implemented by this experiment.
 ht_ai_gen = ["layout/ht_ai_gen", "servo-config/ht_ai_gen"]
 jitspew = ["script/jitspew"]
 js_backtrace = ["script/js_backtrace"]

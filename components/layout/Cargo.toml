@@ -17,8 +17,7 @@ doctest = false
 
 [features]
 tracing = ["dep:tracing"]
-# Agentic-experiment umbrella gate. When off, behavior is stock Servo (see
-# bundle/journal/2026-10-08-deferred-ai-gen-feature-flag.md).
+# Fork-only gate for CSS features implemented by this experiment.
 ht_ai_gen = []
 
 [dependencies]
