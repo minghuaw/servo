@@ -284,6 +284,7 @@ malloc_size_of_is_0!(FragmentFlags);
 /// A data structure used to hold DOM and pseudo-element information about
 /// a particular layout object.
 #[derive(Clone, Copy, Eq, MallocSizeOf, PartialEq)]
+#[cfg_attr(feature = "ht_ai_gen", derive(Hash))]
 pub(crate) struct Tag {
     pub(crate) node: OpaqueNode,
     pub(crate) pseudo_element_chain: PseudoElementChain,

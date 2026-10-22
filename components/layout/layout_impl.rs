@@ -85,6 +85,8 @@ use webrender_api::units::{DevicePixel, LayoutVector2D};
 
 use crate::accessibility::{AccessibilityContext, AccessibilityDamageMap, AccessibilityTree};
 use crate::context::{CachedImageOrError, ImageResolver, LayoutContext};
+#[cfg(feature = "ht_ai_gen")]
+use crate::display_list::ShapeMaskImageCache;
 use crate::display_list::{DisplayListBuilder, HitTest, PaintTimingHandler, StackingContextTree};
 use crate::dom::NodeExt;
 use crate::query::{
@@ -196,6 +198,11 @@ pub struct LayoutThread {
 
     /// The [`StackingContextTree`] cached from previous layouts.
     stacking_context_tree: RefCell<Option<StackingContextTree>>,
+
+    /// Cache of `clip-path` shape masks uploaded to WebRender, keyed by content
+    /// hash, so that repeated display-list builds reuse the same images.
+    #[cfg(feature = "ht_ai_gen")]
+    shape_mask_image_cache: RefCell<ShapeMaskImageCache>,
 
     // A cache that maps image resources specified in CSS (e.g as the `url()` value
     // for `background-image` or `content` properties) to either the final resolved
@@ -854,6 +861,8 @@ impl LayoutThread {
             box_tree: Default::default(),
             fragment_tree: Default::default(),
             stacking_context_tree: Default::default(),
+            #[cfg(feature = "ht_ai_gen")]
+            shape_mask_image_cache: Default::default(),
             paint_api: config.paint_api,
             stylist: Stylist::new(device, QuirksMode::NoQuirks),
             resolved_images_cache: Default::default(),
@@ -1570,6 +1579,12 @@ impl LayoutThread {
             paint_timing_handler,
             reflow_statistics,
             reflow_request.frame_focused,
+            #[cfg(feature = "ht_ai_gen")]
+            &self.paint_api,
+            #[cfg(feature = "ht_ai_gen")]
+            self.webview_id,
+            #[cfg(feature = "ht_ai_gen")]
+            &self.shape_mask_image_cache,
         );
 
         stacking_context_tree.paint_info.paint_timing_info = reflow_request.paint_timing_info;

@@ -14,6 +14,8 @@ use paint_api::display_list::{
     AxesScrollSensitivity, PaintDisplayListInfo, ReferenceFrameNodeInfo, ScrollType,
     ScrollableNodeInfo, SpatialTreeNodeInfo, StickyNodeInfo, TouchAction,
 };
+#[cfg(feature = "ht_ai_gen")]
+use rustc_hash::FxHashMap;
 use servo_base::id::ScrollTreeNodeId;
 use servo_base::print_tree::PrintTree;
 use servo_config::opts::{DiagnosticsLogging, DiagnosticsLoggingOption};
@@ -25,6 +27,8 @@ use style::computed_values::position::T as ComputedPosition;
 use style::computed_values::text_decoration_style::T as TextDecorationStyle;
 use style::computed_values::text_decoration_thickness::T as TextDecorationThickness;
 use style::values::computed::angle::Angle;
+#[cfg(feature = "ht_ai_gen")]
+use style::values::computed::basic_shape::ClipPath;
 use style::values::computed::{ClipRectOrAuto, Length, TextDecorationLine};
 use style::values::generics::box_::{OverflowClipMarginBox, Perspective};
 use style::values::generics::transform::{
@@ -40,6 +44,8 @@ use super::ClipId;
 use super::clip::StackingContextTreeClipStore;
 use crate::display_list::conversions::ToWebRender;
 use crate::display_list::{BuilderForBoxFragment, offset_radii};
+#[cfg(feature = "ht_ai_gen")]
+use crate::fragment_tree::Tag;
 use crate::fragment_tree::{
     BoxFragment, BoxFragmentWithStyle, ContainingBlockCalculation, ContainingBlockManager,
     Fragment, FragmentFlags, FragmentTree, PositioningFragment,
@@ -122,6 +128,13 @@ pub(crate) struct StackingContextTree {
     /// for things like `overflow`. More clips may be created later during WebRender
     /// display list construction, but they are never added here.
     pub clip_store: StackingContextTreeClipStore,
+
+    /// The `clip-path` clip of a non-atomic inline box, keyed by the box's [`Tag`].
+    /// Such a clip is established by the first fragment of the inline box and shared
+    /// by all of its fragments, because the clip does not follow the fragmented
+    /// content. Only used with `ht_ai_gen`.
+    #[cfg(feature = "ht_ai_gen")]
+    inline_clip_ids: FxHashMap<Tag, ClipId>,
 }
 
 impl StackingContextTree {
@@ -188,6 +201,8 @@ impl StackingContextTree {
             root_stacking_context: StackingContext::root(root_scroll_node_id),
             paint_info,
             clip_store: Default::default(),
+            #[cfg(feature = "ht_ai_gen")]
+            inline_clip_ids: Default::default(),
         };
 
         let text_decorations = Default::default();
@@ -730,6 +745,38 @@ impl BoxFragment {
             &containing_block.rect,
         );
 
+        #[cfg(feature = "ht_ai_gen")]
+        let clip_id = {
+            let clip_path = &style.get_svg().clip_path;
+            let inline_clip_key =
+                if *clip_path != ClipPath::None && style.is_inline_box(with_style.base.flags) {
+                    with_style.base.tag
+                } else {
+                    None
+                };
+            let inline_clip_id = inline_clip_key
+                .and_then(|tag| stacking_context_tree.inline_clip_ids.get(&tag).copied());
+            match inline_clip_id {
+                // A fragmented non-atomic inline box uses one clip, established by its
+                // first fragment and shared by all of its fragments.
+                Some(inline_clip_id) => Some(inline_clip_id),
+                None => {
+                    let clip_id = stacking_context_tree.clip_store.add_for_clip_path(
+                        clip_path,
+                        spatial_id.unwrap_or(containing_block.scroll_node_id),
+                        clip_id.unwrap_or(containing_block.clip_id),
+                        with_style,
+                        containing_block.rect.origin,
+                    );
+                    if let (Some(clip_id), Some(tag)) = (clip_id, inline_clip_key) {
+                        stacking_context_tree.inline_clip_ids.insert(tag, clip_id);
+                    }
+                    clip_id
+                },
+            }
+            .or(clip_id)
+        };
+        #[cfg(not(feature = "ht_ai_gen"))]
         let clip_id = stacking_context_tree
             .clip_store
             .add_for_clip_path(

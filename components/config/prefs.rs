@@ -62,6 +62,10 @@ pub fn set(preferences: Preferences) {
         preferences.layout_css_progress_function_enabled
     );
     stylo_static_prefs::set_pref!(
+        "layout.css.basic-shape-shape.enabled",
+        preferences.layout_css_basic_shape_shape_enabled
+    );
+    stylo_static_prefs::set_pref!(
         "layout.writing-mode.enabled",
         preferences.layout_writing_mode_enabled
     );
@@ -305,6 +309,7 @@ pub struct Preferences {
     // feature: CSS Grid | #34479 | Web/CSS/Guides/Grid_layout
     pub layout_grid_enabled: bool,
     pub layout_container_queries_enabled: bool,
+    pub layout_css_basic_shape_shape_enabled: bool,
     pub layout_css_ellipse_corners_enabled: bool,
     pub layout_css_progress_function_enabled: bool,
     pub layout_style_sharing_cache_enabled: bool,
@@ -555,6 +560,7 @@ impl Preferences {
             layout_animations_test_enabled: false,
             layout_columns_enabled: false,
             layout_container_queries_enabled: false,
+            layout_css_basic_shape_shape_enabled: cfg!(feature = "ht_ai_gen"),
             layout_css_ellipse_corners_enabled: false,
             layout_css_progress_function_enabled: false,
             layout_flexbox_balance: false,

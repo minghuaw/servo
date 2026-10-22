@@ -23,7 +23,7 @@ default = ["bundled", "clipboard", "js_jit", "multiprocess"]
 #  configuration with `--no-default-features` build
 #
 # A convenience feature to enable all default web features servo has.
-default_web_features = ["brotli-compression-stream", "clipboard", "webcrypto", "webgpu", "webgl", "webxr"]
+default_web_features = ["brotli-compression-stream", "clipboard", "ht_ai_gen", "webcrypto", "webgpu", "webgl", "webxr"]
 # Bundle required resources in the binary.
 bundled = ["baked-in-resources", "bundled_freetype"]
 
@@ -54,6 +54,8 @@ gamepad = [
     "servo-constellation/gamepad",
     "embedder_traits/gamepad",
 ]
+# Fork-only gate for CSS features implemented by this experiment.
+ht_ai_gen = ["layout/ht_ai_gen", "servo-config/ht_ai_gen"]
 jitspew = ["script/jitspew"]
 js_backtrace = ["script/js_backtrace"]
 js_jit = ["script/js_jit"]
