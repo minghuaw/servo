@@ -131,6 +131,9 @@ impl StackingContextTreeClipStore {
                         parent_scroll_node_id,
                         parent_clip_chain_id,
                     ),
+                #[cfg(not(feature = "ht_ai_gen"))]
+                BasicShape::Polygon(_) | BasicShape::PathOrShape(_) => None,
+                #[cfg(feature = "ht_ai_gen")]
                 BasicShape::Polygon(_) | BasicShape::PathOrShape(_) => self
                     .add_for_complex_basic_shape(
                         shape,
@@ -289,17 +292,6 @@ impl StackingContextTreeClipStore {
             shape_mask: Some(shape_mask),
         });
         Some(id)
-    }
-
-    #[cfg(not(feature = "ht_ai_gen"))]
-    fn add_for_complex_basic_shape(
-        &mut self,
-        _shape: &BasicShape,
-        _layout_rect: LayoutRect,
-        _parent_scroll_node_id: ScrollTreeNodeId,
-        _parent_clip_chain_id: ClipId,
-    ) -> Option<ClipId> {
-        None
     }
 }
 
